@@ -100,6 +100,32 @@ export const initialScenario: BattlefieldScenario = {
       { owner: 'redoubt', hexIds: eastHexIds },
     ],
   },
+  battleRules: {
+    combatDataStatus: 'provisional',
+    combatApPerTurn: 2,
+    movementApCost: 1,
+    attackApCost: 1,
+    defaultAttackRange: 1,
+    terrain: {
+      grassland: { movementCost: 1, blocksLineOfSight: false },
+      hills: { movementCost: 2, blocksLineOfSight: false },
+      forest: { movementCost: 2, blocksLineOfSight: true },
+      mountains: { movementCost: null, blocksLineOfSight: true },
+      water: { movementCost: null, blocksLineOfSight: false },
+    },
+    elevationByTerrain: {
+      grassland: 0,
+      hills: 1,
+      forest: 0,
+      mountains: 2,
+      water: 0,
+    },
+    victory: {
+      mode: 'either',
+      objectiveScoreToWin: 3,
+      roundLimitResolution: 'highest-objective-score-draw-on-tie',
+    },
+  },
   units: [
     {
       id: 'unit-ironwatch-01',

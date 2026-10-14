@@ -4,12 +4,14 @@ interface SelectedInfoPanelProps {
   readonly unit: ScenarioUnit | undefined
   readonly hex: BattlefieldHex | undefined
   readonly ownerColor: string | undefined
+  readonly combatApRemaining?: number
 }
 
 export function SelectedInfoPanel({
   unit,
   hex,
   ownerColor,
+  combatApRemaining,
 }: SelectedInfoPanelProps) {
   return (
     <section className="panel selected-panel" aria-labelledby="selection-title">
@@ -40,8 +42,8 @@ export function SelectedInfoPanel({
               </strong>
             </div>
             <div className="vital">
-              <span>AP</span>
-              <strong>{unit.actionPointsRemaining}</strong>
+              <span>{combatApRemaining === undefined ? 'AP' : 'COMBAT AP'}</span>
+              <strong>{combatApRemaining ?? unit.actionPointsRemaining}</strong>
             </div>
           </div>
           <div className="stats-list" aria-label="Temporary unit stats">

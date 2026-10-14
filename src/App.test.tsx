@@ -60,4 +60,22 @@ describe('App', () => {
     expect(screen.getByText('Unoccupied hex')).toBeInTheDocument()
     expect(screen.getAllByText('mountains')).toHaveLength(2)
   })
+
+  it('starts a battle, advances player turns, and restarts the battle', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Start battle' }))
+
+    const battle = screen.getByRole('region', { name: 'Battle' })
+    expect(battle).toHaveTextContent('ACTIVE')
+    expect(battle).toHaveTextContent(/Round 1/)
+    expect(battle).toHaveTextContent(/starts round 1/)
+
+    fireEvent.click(screen.getByRole('button', { name: /^End .* turn$/ }))
+    expect(battle).toHaveTextContent(/begins their turn in round 1/)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restart battle' }))
+    expect(battle).toHaveTextContent('ACTIVE')
+    expect(battle).toHaveTextContent(/Round 1/)
+    expect(battle).toHaveTextContent(/starts round 1/)
+  })
 })

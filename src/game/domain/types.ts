@@ -7,6 +7,32 @@ export type TerrainType =
   | 'mountains'
   | 'water'
 
+export interface TerrainRule {
+  readonly movementCost: number | null
+  readonly blocksLineOfSight: boolean
+}
+
+export type VictoryMode = 'objectives' | 'elimination' | 'either' | 'both'
+
+export interface ScenarioVictoryRules {
+  readonly mode: VictoryMode
+  readonly objectiveScoreToWin?: number
+  readonly roundLimit?: number
+  readonly roundLimitResolution?: 'highest-objective-score-draw-on-tie'
+}
+
+export interface ScenarioBattleRules {
+  readonly combatDataStatus: 'provisional'
+  readonly combatApPerTurn: number
+  readonly movementApCost: number
+  readonly attackApCost: number
+  readonly defaultAttackRange: number
+  readonly terrain: Readonly<Record<TerrainType, TerrainRule>>
+  readonly elevationByTerrain: Readonly<Record<TerrainType, number>>
+  readonly victory: ScenarioVictoryRules
+  readonly startingPlayerId?: string
+}
+
 export interface BattlefieldHex extends AxialCoordinate {
   readonly id: string
   readonly terrain: TerrainType
@@ -53,6 +79,9 @@ export interface ScenarioUnit extends AxialCoordinate {
   readonly maxHp: number
   readonly stats: Readonly<Record<string, number>>
   readonly actionPointsRemaining: number
+  readonly combat?: {
+    readonly attackRange?: number
+  }
 }
 
 export interface BattlefieldScenario {
@@ -68,4 +97,5 @@ export interface BattlefieldScenario {
   readonly playerDefinitions: readonly ScenarioPlayer[]
   readonly setup: ScenarioSetup
   readonly pointBudgets?: Readonly<Record<string, number>>
+  readonly battleRules: ScenarioBattleRules
 }

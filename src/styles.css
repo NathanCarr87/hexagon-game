@@ -583,6 +583,97 @@ button {
   cursor: not-allowed;
 }
 
+.battle-turn,
+.score-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  color: #dce1d5;
+  font-size: 10px;
+}
+
+.battle-turn > span,
+.score-list strong {
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.score-list {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid #ffffff12;
+  border-bottom: 1px solid #ffffff12;
+}
+
+.score-list > div {
+  margin: 0;
+  color: #aeb5a8;
+  font-size: 9px;
+}
+
+.objective-list p,
+.battle-log p {
+  margin: 6px 0;
+  color: #a0a697;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.battle-result {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.battle-result small {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.battle-control,
+.restart-battle {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.battle-control:disabled {
+  color: #777e72;
+  cursor: not-allowed;
+}
+
+.battle-error {
+  color: #ef9a84;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.action-guidance {
+  margin: 7px 0;
+  color: #d5c48c;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.battle-log {
+  max-height: 160px;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding-top: 7px;
+  border-top: 1px solid #ffffff12;
+}
+
+.battle-log small {
+  color: #c5e478;
+  font-family: 'DM Mono', monospace;
+}
+
 .empty-log,
 .empty-selection {
   color: #9fa698;

@@ -16,6 +16,10 @@ interface BattlefieldProps {
   readonly selectedHexId: string | null
   readonly selectedUnitId: string | null
   readonly deploymentMode: boolean
+  readonly battleMode: boolean
+  readonly battleActionMode: 'select' | 'move' | 'attack'
+  readonly movementHexIds: readonly string[]
+  readonly attackHexIds: readonly string[]
   readonly eligibleHexIds: readonly string[]
   readonly occupiedHexIds: readonly string[]
   readonly deploymentTargetHexId: string | null
@@ -39,7 +43,13 @@ function HexTile({
 }: {
   readonly hex: BattlefieldHex
   readonly selected: boolean
-  readonly deploymentStatus: 'eligible' | 'ineligible' | 'occupied' | null
+  readonly deploymentStatus:
+    | 'eligible'
+    | 'ineligible'
+    | 'occupied'
+    | 'move'
+    | 'attack'
+    | null
   readonly isTarget: boolean
   readonly onSelect: () => void
 }) {
@@ -90,7 +100,11 @@ function HexTile({
                 ? '#b8e37f'
                 : deploymentStatus === 'occupied'
                   ? '#ee7864'
-                  : '#b65b4f'
+                  : deploymentStatus === 'move'
+                    ? '#64d9c4'
+                    : deploymentStatus === 'attack'
+                      ? '#f08c73'
+                      : '#b65b4f'
             }
             depthWrite={false}
             opacity={
@@ -98,7 +112,9 @@ function HexTile({
                 ? 0.32
                 : deploymentStatus === 'occupied'
                   ? 0.48
-                  : 0.2
+                  : deploymentStatus === 'move' || deploymentStatus === 'attack'
+                    ? 0.45
+                    : 0.2
             }
             side={2}
             transparent
@@ -328,6 +344,10 @@ function BattlefieldScene({
   selectedHexId,
   selectedUnitId,
   deploymentMode,
+  battleMode,
+  battleActionMode,
+  movementHexIds,
+  attackHexIds,
   eligibleHexIds,
   occupiedHexIds,
   deploymentTargetHexId,
@@ -370,13 +390,17 @@ function BattlefieldScene({
           hex={hex}
           selected={selectedHexId === hex.id}
           deploymentStatus={
-            !deploymentMode
-              ? null
-              : occupiedHexIds.includes(hex.id)
+            deploymentMode
+              ? occupiedHexIds.includes(hex.id)
                 ? 'occupied'
                 : eligibleHexIds.includes(hex.id)
                   ? 'eligible'
                   : 'ineligible'
+              : battleMode && battleActionMode === 'move' && movementHexIds.includes(hex.id)
+                ? 'move'
+                : battleMode && battleActionMode === 'attack' && attackHexIds.includes(hex.id)
+                  ? 'attack'
+                  : null
           }
           isTarget={deploymentTargetHexId === hex.id}
           onSelect={() => onSelectHex(hex.id)}
@@ -413,7 +437,11 @@ function BattlefieldScene({
             onSelect={() =>
               deploymentMode
                 ? onSelectHex(unitHex.id)
-                : onSelectUnit(unit.id)
+                : battleMode &&
+                    battleActionMode === 'move' &&
+                    selectedUnitId
+                  ? onSelectHex(unitHex.id)
+                  : onSelectUnit(unit.id)
             }
           />
         )

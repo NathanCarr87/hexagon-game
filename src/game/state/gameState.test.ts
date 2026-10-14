@@ -129,4 +129,78 @@ describe('scenario setup state', () => {
       initial,
     )
   })
+
+  it('starts and restarts a battle without changing scenario placeholder AP', () => {
+    const scenario = {
+      ...initialScenario,
+      battleRules: {
+        ...initialScenario.battleRules,
+        startingPlayerId: 'blueward',
+      },
+    }
+    const initial = createInitialGameState(scenario)
+    const started = gameReducer(
+      initial,
+      { type: 'start-battle' },
+      scenario,
+    )
+    expect(started.mode).toBe('battle')
+    expect(started.battle?.phase).toBe('active')
+    expect(initialScenario.players).toContain(started.battle?.activePlayerId)
+    expect(
+      started.battle?.units
+        .filter(({ owner }) => owner === started.battle?.activePlayerId)
+        .every(({ combatApRemaining }) => combatApRemaining === 2),
+    ).toBe(true)
+    expect(
+      started.battle?.units
+        .filter(({ owner }) => owner !== started.battle?.activePlayerId)
+        .every(({ combatApRemaining }) => combatApRemaining === 0),
+    ).toBe(true)
+    expect(started.battle?.units[0]?.actionPointsRemaining).toBe(
+      initialScenario.units[0]?.actionPointsRemaining,
+    )
+
+    const moved = gameReducer(
+      started,
+      {
+        type: 'move-unit',
+        unitId: 'unit-ironwatch-01',
+        hexId: 'hex:-3,0',
+      },
+      scenario,
+    )
+    const restarted = gameReducer(
+      moved,
+      { type: 'restart-battle' },
+      scenario,
+    )
+    expect(restarted.mode).toBe('battle')
+    expect(
+      restarted.battle?.units.find(({ id }) => id === 'unit-ironwatch-01'),
+    ).toMatchObject({ q: -2, r: 0, combatApRemaining: 2 })
+  })
+
+  it('does not permit an action by the non-active side to alter battle state', () => {
+    const started = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'start-battle' },
+      initialScenario,
+    )
+    const battle = started.battle!
+    const inactiveUnit = battle.units.find(
+      ({ owner }) => owner !== battle.activePlayerId,
+    )!
+    const state = gameReducer(
+      started,
+      {
+        type: 'move-unit',
+        unitId: inactiveUnit.id,
+        hexId: `hex:${inactiveUnit.q},${inactiveUnit.r - 1}`,
+      },
+      initialScenario,
+    )
+    expect(state.battle).toBe(battle)
+    expect(state.battleMessage).toMatch(/active-player/)
+  })
 })
