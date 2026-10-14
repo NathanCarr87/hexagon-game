@@ -1,5 +1,5 @@
-import type { TerrainType } from '../domain/types'
-import { OWNER_COLORS, TERRAIN_APPEARANCE } from '../scene/terrainAppearance'
+import type { ScenarioPlayer, TerrainType } from '../domain/types'
+import { TERRAIN_APPEARANCE } from '../scene/terrainAppearance'
 
 const terrainTypes: readonly TerrainType[] = [
   'grassland',
@@ -9,7 +9,11 @@ const terrainTypes: readonly TerrainType[] = [
   'water',
 ]
 
-export function TerrainLegend() {
+export function TerrainLegend({
+  players,
+}: {
+  readonly players: readonly ScenarioPlayer[]
+}) {
   return (
     <div className="legend-bar" aria-label="Terrain and ownership legend">
       <div className="legend-group">
@@ -26,13 +30,13 @@ export function TerrainLegend() {
       </div>
       <div className="legend-group ownership-legend">
         <span className="legend-heading">FORCES</span>
-        {Object.entries(OWNER_COLORS).map(([owner, color]) => (
-          <span className="legend-item" key={owner}>
+        {players.map(({ id, name, color }) => (
+          <span className="legend-item" key={id}>
             <span
               className="legend-swatch owner-swatch"
               style={{ backgroundColor: color }}
             />
-            {owner}
+            {name}
           </span>
         ))}
       </div>

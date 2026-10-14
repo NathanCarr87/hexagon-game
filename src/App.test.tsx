@@ -35,19 +35,22 @@ describe('App', () => {
       screen.getByRole('heading', { name: /the narrows/i }),
     ).toBeInTheDocument()
     expect(screen.getByTestId('battlefield')).toBeInTheDocument()
-    expect(screen.getByText('Ironwatch-01')).toBeInTheDocument()
+    expect(screen.getAllByText('Ironwatch-01').length).toBeGreaterThan(0)
+    expect(screen.getByText(/unit stat costs/i)).toBeInTheDocument()
     expect(screen.getByText(/temporary scenario data/i)).toBeInTheDocument()
   })
 
   it('restores the initial selection when the scenario is reset', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Select other unit' }))
-    expect(screen.getByText('Ashfall-01')).toBeInTheDocument()
+    expect(screen.getAllByText('Ashfall-01').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset scenario' }))
 
-    expect(screen.getByText('Ironwatch-01')).toBeInTheDocument()
-    expect(screen.getAllByText('blueward')).toHaveLength(2)
+    expect(screen.getAllByText('Ironwatch-01').length).toBeGreaterThan(0)
+    expect(
+      screen.getByRole('region', { name: 'Selected unit' }),
+    ).toHaveTextContent('q-2 / r0')
   })
 
   it('shows selected empty hex data', () => {

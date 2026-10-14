@@ -5,6 +5,7 @@ import type { GameAction, GameState } from './game/state/gameState'
 import { Battlefield } from './game/scene/Battlefield'
 import { SelectedInfoPanel } from './game/ui/SelectedInfoPanel'
 import { TerrainLegend } from './game/ui/TerrainLegend'
+import { ForceSetupPanel } from './game/ui/ForceSetupPanel'
 
 const scenarioReducer = (state: GameState, action: GameAction): GameState =>
   gameReducer(state, action, initialScenario)
@@ -18,9 +19,17 @@ function App() {
   const selectedHex = initialScenario.hexes.find(
     (hex) => hex.id === gameState.selectedHexId,
   )
-  const selectedUnit = initialScenario.units.find(
+  const selectedUnit = gameState.units.find(
     (unit) => unit.id === gameState.selectedUnitId,
   )
+  const eligibleHexIds = selectedUnit
+    ? initialScenario.setup.deploymentZones.find(
+        ({ owner }) => owner === selectedUnit.owner,
+      )?.hexIds ?? []
+    : []
+  const occupiedHexIds = gameState.units
+    .filter((unit) => unit.id !== gameState.selectedUnitId)
+    .map((unit) => `hex:${unit.q},${unit.r}`)
 
   return (
     <main className="game-shell">
@@ -62,23 +71,44 @@ function App() {
           <div className="scene-frame">
             <Battlefield
               scenario={initialScenario}
+              units={gameState.units}
               selectedHexId={gameState.selectedHexId}
               selectedUnitId={gameState.selectedUnitId}
+              deploymentMode={gameState.mode === 'deployment'}
+              eligibleHexIds={eligibleHexIds}
+              occupiedHexIds={occupiedHexIds}
+              deploymentTargetHexId={gameState.deploymentTargetHexId}
               onSelectHex={(hexId) => dispatch({ type: 'select-hex', hexId })}
               onSelectUnit={(unitId) =>
                 dispatch({ type: 'select-unit', unitId })
               }
             />
             <div className="scene-caption">
-              <span>AXIAL GRID&nbsp; / &nbsp;{initialScenario.hexes.length} HEXES</span>
+              <span>
+                {gameState.mode === 'deployment' ? 'DEPLOYMENT SETUP' : 'AXIAL GRID'}
+                &nbsp; / &nbsp;{initialScenario.hexes.length} HEXES
+              </span>
               <span>DRAG TO ORBIT&nbsp; · &nbsp;SCROLL TO ZOOM</span>
             </div>
           </div>
-          <TerrainLegend />
+          <TerrainLegend players={initialScenario.playerDefinitions} />
         </div>
 
         <aside className="sidebar" aria-label="Battlefield information">
-          <SelectedInfoPanel unit={selectedUnit} hex={selectedHex} />
+          <SelectedInfoPanel
+            unit={selectedUnit}
+            hex={selectedHex}
+            ownerColor={
+              initialScenario.playerDefinitions.find(
+                ({ id }) => id === selectedUnit?.owner,
+              )?.color
+            }
+          />
+          <ForceSetupPanel
+            scenario={initialScenario}
+            state={gameState}
+            dispatch={dispatch}
+          />
           <section className="panel event-panel" aria-labelledby="event-title">
             <div className="panel-heading">
               <h2 id="event-title">Field log</h2>

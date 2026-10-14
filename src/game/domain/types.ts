@@ -26,6 +26,24 @@ export interface ScenarioObjective extends AxialCoordinate {
   readonly name: string
 }
 
+export interface ScenarioPlayer {
+  readonly id: string
+  readonly name: string
+  readonly color: string
+}
+
+export interface DeploymentZone {
+  readonly owner: string
+  readonly hexIds: readonly string[]
+}
+
+export interface ScenarioSetup {
+  readonly rulesStatus: 'provisional'
+  readonly allowReposition: boolean
+  readonly allowMultipleUnitsPerHex: false
+  readonly deploymentZones: readonly DeploymentZone[]
+}
+
 export interface ScenarioUnit extends AxialCoordinate {
   readonly id: string
   readonly name: string
@@ -47,4 +65,7 @@ export interface BattlefieldScenario {
   readonly objectives: readonly ScenarioObjective[]
   readonly units: readonly ScenarioUnit[]
   readonly players: readonly string[]
+  readonly playerDefinitions: readonly ScenarioPlayer[]
+  readonly setup: ScenarioSetup
+  readonly pointBudgets?: Readonly<Record<string, number>>
 }

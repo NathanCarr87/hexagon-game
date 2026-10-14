@@ -40,4 +40,21 @@ describe('initial battlefield scenario', () => {
     ).toBe(true)
     expect(initialScenario.dataStatus).toBe('temporary-placeholder')
   })
+
+  it('keeps setup zones explicitly provisional and matches starting ownership', () => {
+    expect(initialScenario.setup.rulesStatus).toBe('provisional')
+    expect(initialScenario.setup.allowMultipleUnitsPerHex).toBe(false)
+    expect(initialScenario.pointBudgets).toBeUndefined()
+    expect(
+      initialScenario.units.every((unit) =>
+        initialScenario.setup.deploymentZones
+          .find(({ owner }) => owner === unit.owner)
+          ?.hexIds.includes(hexId(unit)),
+      ),
+    ).toBe(true)
+    expect(initialScenario.playerDefinitions).toEqual([
+      { id: 'blueward', name: 'Blueward', color: '#76b8e8' },
+      { id: 'redoubt', name: 'Redoubt', color: '#e28a72' },
+    ])
+  })
 })

@@ -41,8 +41,3 @@ export const TERRAIN_APPEARANCE: Readonly<
     surfaceHeight: 0.08,
   },
 }
-
-export const OWNER_COLORS: Readonly<Record<string, string>> = {
-  blueward: '#76b8e8',
-  redoubt: '#e28a72',
-}

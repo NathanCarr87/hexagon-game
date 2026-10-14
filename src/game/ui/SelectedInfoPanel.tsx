@@ -3,9 +3,14 @@ import type { BattlefieldHex, ScenarioUnit } from '../domain/types'
 interface SelectedInfoPanelProps {
   readonly unit: ScenarioUnit | undefined
   readonly hex: BattlefieldHex | undefined
+  readonly ownerColor: string | undefined
 }
 
-export function SelectedInfoPanel({ unit, hex }: SelectedInfoPanelProps) {
+export function SelectedInfoPanel({
+  unit,
+  hex,
+  ownerColor,
+}: SelectedInfoPanelProps) {
   return (
     <section className="panel selected-panel" aria-labelledby="selection-title">
       <div className="panel-heading">
@@ -17,7 +22,10 @@ export function SelectedInfoPanel({ unit, hex }: SelectedInfoPanelProps) {
           <p className="unit-name">{unit.name}</p>
           <p className="unit-type">{unit.unitType.replaceAll('-', ' ')}</p>
           <div className="unit-owner">
-            <span className={`owner-swatch owner-${unit.owner}`} />
+            <span
+              className="owner-swatch"
+              style={{ backgroundColor: ownerColor ?? '#ded9bf' }}
+            />
             {unit.owner}
             <span className="coordinate">
               q{unit.q} / r{unit.r}

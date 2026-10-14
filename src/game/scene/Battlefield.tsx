@@ -8,12 +8,17 @@ import type {
   ScenarioUnit,
 } from '../domain/types'
 import { axialToWorld } from '../hex/coordinates'
-import { OWNER_COLORS, TERRAIN_APPEARANCE } from './terrainAppearance'
+import { TERRAIN_APPEARANCE } from './terrainAppearance'
 
 interface BattlefieldProps {
   readonly scenario: BattlefieldScenario
+  readonly units: readonly ScenarioUnit[]
   readonly selectedHexId: string | null
   readonly selectedUnitId: string | null
+  readonly deploymentMode: boolean
+  readonly eligibleHexIds: readonly string[]
+  readonly occupiedHexIds: readonly string[]
+  readonly deploymentTargetHexId: string | null
   readonly onSelectHex: (hexId: string) => void
   readonly onSelectUnit: (unitId: string) => void
 }
@@ -28,10 +33,14 @@ function elevationAt(hex: BattlefieldHex): number {
 function HexTile({
   hex,
   selected,
+  deploymentStatus,
+  isTarget,
   onSelect,
 }: {
   readonly hex: BattlefieldHex
   readonly selected: boolean
+  readonly deploymentStatus: 'eligible' | 'ineligible' | 'occupied' | null
+  readonly isTarget: boolean
   readonly onSelect: () => void
 }) {
   const appearance = TERRAIN_APPEARANCE[hex.terrain]
@@ -72,6 +81,39 @@ function HexTile({
           threshold={15}
         />
       </mesh>
+      {deploymentStatus && (
+        <mesh position={[0, top + 0.012, 0]}>
+          <cylinderGeometry args={[0.91, 0.91, 0.025, 6]} />
+          <meshBasicMaterial
+            color={
+              deploymentStatus === 'eligible'
+                ? '#b8e37f'
+                : deploymentStatus === 'occupied'
+                  ? '#ee7864'
+                  : '#b65b4f'
+            }
+            depthWrite={false}
+            opacity={
+              deploymentStatus === 'eligible'
+                ? 0.32
+                : deploymentStatus === 'occupied'
+                  ? 0.48
+                  : 0.2
+            }
+            side={2}
+            transparent
+          />
+        </mesh>
+      )}
+      {isTarget && (
+        <mesh
+          position={[0, top + 0.04, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <ringGeometry args={[0.7, 0.78, 6]} />
+          <meshBasicMaterial color="#f2d78e" side={2} />
+        </mesh>
+      )}
       {hex.terrain === 'hills' && <Hilltop height={top} />}
       {hex.terrain === 'forest' && <ForestCanopy height={top} seed={hex.q * 7 + hex.r * 11} />}
       {hex.terrain === 'mountains' && <MountainPeak height={top} />}
@@ -169,24 +211,32 @@ function UnitFigure({
   unit,
   selected,
   hex,
+  ownerColor,
+  preview = false,
   onSelect,
 }: {
   readonly unit: ScenarioUnit
   readonly selected: boolean
   readonly hex: BattlefieldHex
+  readonly ownerColor: string
+  readonly preview?: boolean
   readonly onSelect: () => void
 }) {
   const position = axialToWorld(unit)
-  const color = OWNER_COLORS[unit.owner] ?? '#ded9bf'
+  const color = ownerColor
   const y = elevationAt(hex) + 0.07
   const scout = unit.unitType === 'scout'
   return (
     <group
       position={[position.x, y, position.z]}
-      onClick={(event) => {
-        event.stopPropagation()
-        onSelect()
-      }}
+      onClick={
+        preview
+          ? undefined
+          : (event) => {
+              event.stopPropagation()
+              onSelect()
+            }
+      }
       onPointerEnter={() => {
         document.body.style.cursor = 'pointer'
       }}
@@ -200,6 +250,8 @@ function UnitFigure({
           color={selected ? '#f2e3a4' : color}
           emissive={selected ? '#665523' : '#000000'}
           emissiveIntensity={selected ? 0.3 : 0}
+          transparent={preview}
+          opacity={preview ? 0.48 : 1}
           roughness={0.68}
         />
       </mesh>
@@ -209,11 +261,21 @@ function UnitFigure({
         ) : (
           <capsuleGeometry args={[0.16, 0.32, 3, 6]} />
         )}
-        <meshStandardMaterial color={color} roughness={0.75} />
+        <meshStandardMaterial
+          color={color}
+          transparent={preview}
+          opacity={preview ? 0.48 : 1}
+          roughness={0.75}
+        />
       </mesh>
       <mesh position={[0, scout ? 0.6 : 0.67, 0]} castShadow>
         <sphereGeometry args={[0.12, 8, 6]} />
-        <meshStandardMaterial color="#d2c6a6" roughness={0.8} />
+        <meshStandardMaterial
+          color="#d2c6a6"
+          transparent={preview}
+          opacity={preview ? 0.48 : 1}
+          roughness={0.8}
+        />
       </mesh>
       {selected && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -262,8 +324,13 @@ function CameraController({ resetVersion }: { readonly resetVersion: number }) {
 
 function BattlefieldScene({
   scenario,
+  units,
   selectedHexId,
   selectedUnitId,
+  deploymentMode,
+  eligibleHexIds,
+  occupiedHexIds,
+  deploymentTargetHexId,
   onSelectHex,
   onSelectUnit,
   resetVersion,
@@ -302,6 +369,16 @@ function BattlefieldScene({
           key={hex.id}
           hex={hex}
           selected={selectedHexId === hex.id}
+          deploymentStatus={
+            !deploymentMode
+              ? null
+              : occupiedHexIds.includes(hex.id)
+                ? 'occupied'
+                : eligibleHexIds.includes(hex.id)
+                  ? 'eligible'
+                  : 'ineligible'
+          }
+          isTarget={deploymentTargetHexId === hex.id}
           onSelect={() => onSelectHex(hex.id)}
         />
       ))}
@@ -319,7 +396,7 @@ function BattlefieldScene({
           />
         )
       })}
-      {scenario.units.map((unit) => {
+      {units.map((unit) => {
         const unitHex = hexById.get(`hex:${unit.q},${unit.r}`)
         if (!unitHex) return null
         return (
@@ -327,11 +404,41 @@ function BattlefieldScene({
             key={unit.id}
             unit={unit}
             hex={unitHex}
+            ownerColor={
+              scenario.playerDefinitions.find(
+                ({ id }) => id === unit.owner,
+              )?.color ?? '#ded9bf'
+            }
             selected={unit.id === selectedUnitId}
-            onSelect={() => onSelectUnit(unit.id)}
+            onSelect={() =>
+              deploymentMode
+                ? onSelectHex(unitHex.id)
+                : onSelectUnit(unit.id)
+            }
           />
         )
       })}
+      {deploymentTargetHexId && selectedUnitId && (() => {
+        const unit = units.find(({ id }) => id === selectedUnitId)
+        const targetHex = hexById.get(deploymentTargetHexId)
+        if (!unit || !targetHex) return null
+        const previewUnit = { ...unit, q: targetHex.q, r: targetHex.r }
+        return (
+          <UnitFigure
+            key={`preview:${unit.id}`}
+            unit={previewUnit}
+            hex={targetHex}
+            ownerColor={
+              scenario.playerDefinitions.find(
+                ({ id }) => id === unit.owner,
+              )?.color ?? '#ded9bf'
+            }
+            selected={false}
+            preview
+            onSelect={() => undefined}
+          />
+        )
+      })()}
       <CameraController resetVersion={resetVersion} />
     </>
   )

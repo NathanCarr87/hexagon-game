@@ -87,6 +87,19 @@ export const initialScenario: BattlefieldScenario = {
     { id: 'objective-crossing', name: 'Crossing Marker', q: 0, r: 1 },
   ],
   players: ['blueward', 'redoubt'],
+  playerDefinitions: [
+    { id: 'blueward', name: 'Blueward', color: '#76b8e8' },
+    { id: 'redoubt', name: 'Redoubt', color: '#e28a72' },
+  ],
+  setup: {
+    rulesStatus: 'provisional',
+    allowReposition: true,
+    allowMultipleUnitsPerHex: false,
+    deploymentZones: [
+      { owner: 'blueward', hexIds: westHexIds },
+      { owner: 'redoubt', hexIds: eastHexIds },
+    ],
+  },
   units: [
     {
       id: 'unit-ironwatch-01',
