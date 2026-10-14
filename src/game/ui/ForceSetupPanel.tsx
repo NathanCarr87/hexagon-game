@@ -23,20 +23,61 @@ export function ForceSetupPanel({
     <>
       <section className="panel setup-panel" aria-labelledby="construction-title">
         <div className="panel-heading">
-          <h2 id="construction-title">Force construction</h2>
+          <h2 id="construction-title">Force rosters</h2>
           <span className="setup-status">RULES NEEDED</span>
         </div>
         <p className="setup-message">
-          Unit stat costs, construction limits, prefab templates, and a point
-          budget are not defined in this repository. Construction is
-          intentionally unavailable until those rules are supplied.
+          These scenario-provided units are provisional presets, not a priced
+          template catalog. Force editing and cost validation stay unavailable
+          until authoritative unit pricing and construction rules are supplied.
         </p>
-        <div className="setup-budget">
-          <span>Scenario point budget</span>
-          <strong>
-            {scenario.pointBudgets ? 'Configured' : 'Not configured'}
-          </strong>
-        </div>
+        <p className="deployment-rules">
+          Recommended: {scenario.recommendedForceSize}. No budget is configured.
+        </p>
+        {scenario.players.map((playerId) => {
+          const player = scenario.playerDefinitions.find(
+            ({ id }) => id === playerId,
+          )
+          const roster = state.units.filter(({ owner }) => owner === playerId)
+          return (
+            <div className="force-roster" key={playerId}>
+              <div className="roster-heading">
+                <span>
+                  <span
+                    className="owner-swatch"
+                    style={{ backgroundColor: player?.color ?? '#ded9bf' }}
+                  />{' '}
+                  {player?.name ?? playerId}
+                </span>
+                <strong>{roster.length} units</strong>
+              </div>
+              <p className="roster-cost">
+                Total cost <strong>Unavailable — no pricing rules</strong>
+              </p>
+              <ul className="starting-units">
+                {roster.map((unit) => (
+                  <li key={unit.id}>
+                    <button
+                      className={`starting-unit${selectedUnit?.id === unit.id ? ' selected' : ''}`}
+                      onClick={() =>
+                        dispatch({ type: 'select-unit', unitId: unit.id })
+                      }
+                      type="button"
+                    >
+                      <span>
+                        <strong>{unit.name}</strong>
+                        <small>{unit.unitType.replaceAll('-', ' ')}</small>
+                      </span>
+                      <span className="starting-unit-coordinate">
+                        q{unit.q} / r{unit.r}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </section>
 
       <section className="panel setup-panel" aria-labelledby="deployment-title">
@@ -70,40 +111,6 @@ export function ForceSetupPanel({
           disallowed; terrain restrictions and ownership rules are otherwise
           not defined.
         </p>
-        <div className="roster-heading">
-          <span>Starting pieces</span>
-          <strong>{state.units.length}</strong>
-        </div>
-        <ul className="starting-units">
-          {state.units.map((unit) => {
-            const player = scenario.playerDefinitions.find(
-              ({ id }) => id === unit.owner,
-            )
-            return (
-              <li key={unit.id}>
-                <button
-                  className={`starting-unit${selectedUnit?.id === unit.id ? ' selected' : ''}`}
-                  onClick={() =>
-                    dispatch({ type: 'select-unit', unitId: unit.id })
-                  }
-                  type="button"
-                >
-                  <span
-                    className="owner-swatch"
-                    style={{ backgroundColor: player?.color ?? '#ded9bf' }}
-                  />
-                  <span>
-                    <strong>{unit.name}</strong>
-                    <small>{unit.unitType.replaceAll('-', ' ')}</small>
-                  </span>
-                  <span className="starting-unit-coordinate">
-                    q{unit.q} / r{unit.r}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
         {state.mode === 'deployment' && (
           <div className="placement-status" aria-live="polite">
             {targetHex && (

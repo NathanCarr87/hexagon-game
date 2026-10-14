@@ -36,7 +36,7 @@ describe('App', () => {
     ).toBeInTheDocument()
     expect(screen.getByTestId('battlefield')).toBeInTheDocument()
     expect(screen.getAllByText('Ironwatch-01').length).toBeGreaterThan(0)
-    expect(screen.getByText(/unit stat costs/i)).toBeInTheDocument()
+    expect(screen.getByText(/unit pricing and construction rules/i)).toBeInTheDocument()
     expect(screen.getByText(/temporary scenario data/i)).toBeInTheDocument()
   })
 
@@ -77,5 +77,27 @@ describe('App', () => {
     expect(battle).toHaveTextContent('ACTIVE')
     expect(battle).toHaveTextContent(/Round 1/)
     expect(battle).toHaveTextContent(/starts round 1/)
+  })
+
+  it('switches to the open-ground scenario and can return from battle setup', () => {
+    render(<App />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Choose scenario' }), {
+      target: { value: 'open-ground' },
+    })
+    expect(
+      screen.getByRole('heading', { name: 'Open Ground' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('grassland')).toBeInTheDocument()
+    expect(screen.queryByText('water')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start battle' }))
+    expect(screen.getByRole('region', { name: 'Battle' })).toHaveTextContent(
+      'ACTIVE',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Return to setup' }))
+    expect(screen.getByRole('region', { name: 'Battle' })).toHaveTextContent(
+      'SETUP',
+    )
+    expect(screen.getByRole('button', { name: 'Start battle' })).toBeEnabled()
   })
 })

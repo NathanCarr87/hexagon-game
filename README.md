@@ -19,7 +19,8 @@ Run the unit tests with `npm test`, and create a production build with
   utilities.
 - `src/game/domain/` defines scenario, terrain, region, objective, and unit data
   contracts without depending on React or Three.js.
-- `src/game/scenarios/` provides the temporary initial battlefield data.
+- `src/game/scenarios/` provides the selectable scenario registry, deterministic
+  scenario definitions, and rendering-independent scenario validation.
 - `src/game/state/` owns immutable setup, deployment, battle lifecycle,
   movement, combat, and victory behavior.
 - `src/game/scene/` maps scenario data to terrain, units, lighting, and camera.
@@ -37,9 +38,15 @@ movement, combat, action points, objectives, and victory. The scenario's unit
 HP, Power, Guard, and Mobility values remain temporary provisional inputs for
 exercising those rules, not authoritative unit designs.
 
-The current setup panel intentionally disables force construction: no stat
-names/costs, pricing formula, unit constraints, prefab definitions, or army
-point budget are established here. The deployment interface is a provisional
-setup scaffold only. Its scenario-defined zones split the current map by axial
-`q`, prohibit stacking, and allow repositioning the existing placeholder units;
-these are clearly marked provisional and do not establish final game rules.
+The scenario catalog and setup workflow are documented in
+[docs/scenarios.md](./docs/scenarios.md). Players can select either The Narrows
+or Open Ground, inspect and deploy its scenario roster, start a battle, return
+to setup, or reset the selected scenario. Scenario validation runs before
+battle start.
+
+Force construction remains intentionally unavailable: this repository has no
+authoritative stat costs, pricing formula, construction constraints, prefab
+definitions, or army budget. Current rosters and deployment zones are
+scenario-provided provisional test data, not constructed forces or templates.
+Configured scenario budgets are rejected until they can be validated against
+an authoritative pricing service.

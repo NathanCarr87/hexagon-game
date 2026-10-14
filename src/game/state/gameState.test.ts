@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { openGroundScenario } from '../scenarios/openGround'
 import { initialScenario } from '../scenarios/initialScenario'
 import { createInitialGameState, gameReducer } from './gameState'
 
@@ -133,6 +134,7 @@ describe('scenario setup state', () => {
   it('starts and restarts a battle without changing scenario placeholder AP', () => {
     const scenario = {
       ...initialScenario,
+      startingPlayerPolicy: 'configured' as const,
       battleRules: {
         ...initialScenario.battleRules,
         startingPlayerId: 'blueward',
@@ -179,6 +181,48 @@ describe('scenario setup state', () => {
     expect(
       restarted.battle?.units.find(({ id }) => id === 'unit-ironwatch-01'),
     ).toMatchObject({ q: -2, r: 0, combatApRemaining: 2 })
+  })
+
+  it('selects a scenario, starts its configured battle, and returns to its deployed setup', () => {
+    const selected = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'select-scenario', scenarioId: openGroundScenario.id },
+    )
+    expect(selected.scenario.id).toBe('open-ground')
+    expect(selected.units.map(({ id }) => id)).toEqual(
+      openGroundScenario.units.map(({ id }) => id),
+    )
+
+    const started = gameReducer(selected, { type: 'start-battle' })
+    expect(started.battle?.phase).toBe('active')
+    expect(started.battle?.activePlayerId).toBe('blueward')
+
+    const moved = gameReducer(started, {
+      type: 'move-unit',
+      unitId: 'open-ground-unit-ironwatch-01',
+      hexId: 'hex:-3,0',
+    })
+    expect(moved.battle?.units.find(
+      ({ id }) => id === 'open-ground-unit-ironwatch-01',
+    )).toMatchObject({ q: -3, r: 0 })
+
+    const setup = gameReducer(moved, { type: 'return-to-setup' })
+    expect(setup.mode).toBe('deployment')
+    expect(setup.battle).toBeNull()
+    expect(setup.units.find(
+      ({ id }) => id === 'open-ground-unit-ironwatch-01',
+    )).toMatchObject({ q: -2, r: 0 })
+  })
+
+  it('does not allow battle start when scenario validation fails', () => {
+    const scenario = {
+      ...initialScenario,
+      objectives: [],
+    }
+    const state = createInitialGameState(scenario)
+    const result = gameReducer(state, { type: 'start-battle' }, scenario)
+    expect(result.battle).toBeNull()
+    expect(result.battleMessage).toMatch(/requires at least one objective/)
   })
 
   it('does not permit an action by the non-active side to alter battle state', () => {

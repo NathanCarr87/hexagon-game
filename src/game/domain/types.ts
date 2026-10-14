@@ -87,7 +87,10 @@ export interface ScenarioUnit extends AxialCoordinate {
 export interface BattlefieldScenario {
   readonly id: string
   readonly title: string
+  readonly description: string
   readonly subtitle: string
+  readonly recommendedForceSize: string
+  readonly boardRadius: number
   readonly dataStatus: 'temporary-placeholder'
   readonly hexes: readonly BattlefieldHex[]
   readonly regions: readonly ScenarioRegion[]
@@ -96,6 +99,7 @@ export interface BattlefieldScenario {
   readonly players: readonly string[]
   readonly playerDefinitions: readonly ScenarioPlayer[]
   readonly setup: ScenarioSetup
+  readonly startingPlayerPolicy: 'random' | 'configured'
   readonly pointBudgets?: Readonly<Record<string, number>>
   readonly battleRules: ScenarioBattleRules
 }

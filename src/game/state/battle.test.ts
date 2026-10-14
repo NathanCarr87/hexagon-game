@@ -12,6 +12,7 @@ import {
   endPlayerTurn,
   evaluateVictory,
   getAttackTargets,
+  getAttackTargetStatus,
   getMovementDestinations,
   moveUnit,
   restartBattle,
@@ -36,6 +37,9 @@ function scenarioWith(
         hexIds: allHexIds,
       })),
     },
+    startingPlayerPolicy: rules.startingPlayerId
+      ? 'configured'
+      : initialScenario.startingPlayerPolicy,
     battleRules: {
       ...initialScenario.battleRules,
       ...rules,
@@ -282,6 +286,14 @@ describe('battle attacks', () => {
         blockedTerrain,
       ),
     ).not.toContain('unit-ashfall-01')
+    expect(
+      getAttackTargetStatus(
+        start(blockedTerrain),
+        'unit-ironwatch-01',
+        'unit-ashfall-01',
+        blockedTerrain,
+      ).reason,
+    ).toMatch(/Line of sight is blocked by forest/)
 
     const blockerUnits = positionedUnits([
       { q: -2, r: 0 },

@@ -136,6 +136,38 @@ button {
   margin: 5px 0 0;
   color: #a4aa9e;
   font-size: 12px;
+  line-height: 1.5;
+}
+
+.header-actions {
+  display: flex;
+  align-items: end;
+  gap: 9px;
+}
+
+.scenario-picker {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scenario-picker select {
+  min-width: 150px;
+  padding: 8px 25px 8px 9px;
+  border: 1px solid #ffffff28;
+  border-radius: 3px;
+  background: #161c18e8;
+  color: #e4e7dc;
+  font: 10px 'DM Sans', sans-serif;
+  text-transform: none;
+}
+
+.scenario-picker select:disabled {
+  color: #777e72;
 }
 
 .control-button,
@@ -465,6 +497,25 @@ button {
   font-weight: 500;
 }
 
+.force-roster + .force-roster {
+  margin-top: 13px;
+}
+
+.roster-cost {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.roster-cost strong {
+  color: #d5c48c;
+  font-weight: 500;
+  text-align: right;
+}
+
 .mode-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -661,6 +712,43 @@ button {
   line-height: 1.5;
 }
 
+.attack-readout {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0;
+  padding: 9px;
+  border: 1px solid #ffffff12;
+  background: #131915;
+  color: #c9cfc2;
+  font-size: 9px;
+}
+
+.attack-readout > strong {
+  color: #d5c48c;
+  font-weight: 500;
+}
+
+.attack-readout p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.attack-readout p + p {
+  padding-top: 6px;
+  border-top: 1px solid #ffffff12;
+}
+
+.attack-readout .target-legal > span {
+  color: var(--accent);
+}
+
+.attack-readout small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .battle-log {
   max-height: 160px;
   margin-top: 12px;
@@ -739,6 +827,27 @@ button {
   }
 }
 
+@media (max-width: 900px) {
+  .battle-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .scene-frame {
+    min-height: min(58vh, 470px);
+  }
+
+  .sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .temporary-note {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+}
+
 @media (max-width: 760px) {
   body {
     min-width: 320px;
@@ -764,6 +873,12 @@ button {
     align-items: start;
     gap: 12px;
     padding-top: 22px;
+  }
+
+  .header-actions {
+    align-items: end;
+    flex-wrap: wrap;
+    justify-content: end;
   }
 
   .scenario-subtitle {

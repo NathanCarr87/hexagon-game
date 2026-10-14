@@ -65,7 +65,11 @@ const hexes: BattlefieldHex[] = coordinates.map((coordinate) => {
 export const initialScenario: BattlefieldScenario = {
   id: 'the-narrows',
   title: 'The Narrows',
+  description:
+    'A provisional terrain-focused test battlefield with a central crossing, wooded approaches, and a broken mountain chain.',
   subtitle: 'A temporary field study across the western approach and eastern highlands.',
+  recommendedForceSize: '2 scenario units per player (provisional values)',
+  boardRadius: BOARD_RADIUS,
   dataStatus: 'temporary-placeholder',
   hexes,
   regions: [
@@ -100,6 +104,7 @@ export const initialScenario: BattlefieldScenario = {
       { owner: 'redoubt', hexIds: eastHexIds },
     ],
   },
+  startingPlayerPolicy: 'random',
   battleRules: {
     combatDataStatus: 'provisional',
     combatApPerTurn: 2,

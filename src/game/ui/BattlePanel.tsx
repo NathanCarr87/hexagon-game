@@ -2,11 +2,17 @@ import type { BattlefieldScenario } from '../domain/types'
 import type { ScenarioUnit } from '../domain/types'
 import {
   getAttackTargets,
+  getAttackTargetStatus,
   getMovementDestinations,
   validateBattleSetup,
   type BattleState,
 } from '../state/battle'
 import type { GameAction } from '../state/gameState'
+import { scenarios } from '../scenarios'
+import {
+  validateScenario,
+  validateScenarioCatalog,
+} from '../scenarios/validateScenario'
 
 interface BattlePanelProps {
   readonly scenario: BattlefieldScenario
@@ -27,7 +33,16 @@ export function BattlePanel({
   message,
   dispatch,
 }: BattlePanelProps) {
-  const startError = validateBattleSetup(units, scenario)
+  const scenarioErrors = [
+    ...validateScenarioCatalog(scenarios),
+    ...validateScenario(scenario),
+  ]
+  const battleSetupError = validateBattleSetup(units, scenario)
+  const setupErrors = [
+    ...scenarioErrors,
+    ...(battleSetupError ? [battleSetupError] : []),
+  ]
+  const startError = setupErrors[0] ?? null
   const activePlayer = scenario.playerDefinitions.find(
     ({ id }) => id === battle?.activePlayerId,
   )
@@ -39,6 +54,23 @@ export function BattlePanel({
   const selectedTargets = battle && selectedUnit
     ? getAttackTargets(battle, selectedUnit.id, scenario)
     : []
+  const enemyTargetChecks =
+    battle && selectedUnit
+      ? battle.units
+          .filter(
+            (unit) =>
+              unit.owner !== selectedUnit.owner && unit.currentHp > 0,
+          )
+          .map((unit) => ({
+            unit,
+            ...getAttackTargetStatus(
+              battle,
+              selectedUnit.id,
+              unit.id,
+              scenario,
+            ),
+          }))
+      : []
   const unavailableReason =
     battle?.phase !== 'active' || actionMode === 'select'
       ? null
@@ -54,7 +86,13 @@ export function BattlePanel({
             : actionMode === 'move' && selectedMovement.length === 0
               ? 'No legal movement destinations are available.'
               : actionMode === 'attack' && selectedTargets.length === 0
-                ? 'No living enemy is in attack range and line of sight.'
+                ? enemyTargetChecks.length === 0
+                  ? 'No living enemy units remain.'
+                  : enemyTargetChecks.find(({ reason }) =>
+                        reason?.startsWith('Line of sight is blocked'),
+                      )?.reason ??
+                    enemyTargetChecks[0]?.reason ??
+                    'No legal attack target is available.'
                 : null
   const controlledObjectives = scenario.objectives.map((objective) => ({
     ...objective,
@@ -77,7 +115,11 @@ export function BattlePanel({
             Start when both players have valid deployments. Combat statistics
             in this scenario are provisional.
           </p>
-          {startError && <p className="battle-error">{startError}</p>}
+          {setupErrors.map((error, index) => (
+            <p className="battle-error" key={`${index}:${error}`}>
+              {error}
+            </p>
+          ))}
           {message && <p className="battle-error">{message}</p>}
           <button
             className="control-button battle-control"
@@ -150,13 +192,30 @@ export function BattlePanel({
                 ))}
               </div>
               <p className="deployment-rules">
-                Move and attack each cost 1 combat AP; each unit receives 2 AP
-                on its owner’s turn.
+                Movement costs {scenario.battleRules.movementApCost} AP and
+                attacks cost {scenario.battleRules.attackApCost} AP. Each unit
+                receives {scenario.battleRules.combatApPerTurn} AP on its
+                owner’s turn.
               </p>
               {unavailableReason && (
                 <p className="action-guidance" aria-live="polite">
                   {unavailableReason}
                 </p>
+              )}
+              {actionMode === 'attack' && enemyTargetChecks.length > 0 && (
+                <div className="attack-readout" aria-label="Attack target checks">
+                  <strong>Enemy target checks</strong>
+                  {enemyTargetChecks.map(({ unit, legal, reason }) => (
+                    <p className={legal ? 'target-legal' : ''} key={unit.id}>
+                      <span>{unit.name}</span>
+                      <small>
+                        HP {unit.currentHp}/{unit.maxHp} · Power{' '}
+                        {unit.stats.Power} · Guard {unit.stats.Guard}
+                      </small>
+                      <small>{legal ? 'Valid target' : reason}</small>
+                    </p>
+                  ))}
+                </div>
               )}
               <button
                 className="control-button battle-control"
@@ -174,6 +233,13 @@ export function BattlePanel({
             type="button"
           >
             Restart battle
+          </button>
+          <button
+            className="mode-button return-setup"
+            onClick={() => dispatch({ type: 'return-to-setup' })}
+            type="button"
+          >
+            Return to setup
           </button>
           <div className="battle-log" aria-label="Battle log" aria-live="polite">
             {battle.log.slice().reverse().map((event) => (

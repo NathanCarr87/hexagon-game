@@ -10,6 +10,7 @@ import {
   hexNeighbors,
   type AxialCoordinate,
 } from '../hex/coordinates'
+import { validateScenario } from '../scenarios/validateScenario'
 
 export interface CombatUnit extends ScenarioUnit {
   readonly combatApRemaining: number
@@ -168,6 +169,10 @@ export function createBattle(
   scenario: BattlefieldScenario,
   random: () => number = Math.random,
 ): { readonly battle: BattleState | null; readonly error: string | null } {
+  const scenarioError = validateScenario(scenario)[0]
+  if (scenarioError) {
+    return { battle: null, error: scenarioError }
+  }
   const error = validateBattleSetup(units, scenario)
   if (error) return { battle: null, error }
   const startingPlayerId =
@@ -337,19 +342,14 @@ function cubeRound(q: number, r: number): AxialCoordinate {
   return { q: rx, r: rz }
 }
 
-function hasLineOfSight(
+function lineOfSightBlocker(
   attacker: CombatUnit,
   target: CombatUnit,
   battle: BattleState,
   scenario: BattlefieldScenario,
-): boolean {
+): string | null {
   const distance = hexDistance(attacker, target)
-  if (distance <= 1) return true
-  const occupied = new Set(
-    battle.units
-      .filter(({ id }) => id !== attacker.id && id !== target.id)
-      .map((unit) => hexId(unit)),
-  )
+  if (distance <= 1) return null
   for (let step = 1; step < distance; step += 1) {
     const ratio = step / distance
     const coordinate = cubeRound(
@@ -358,15 +358,65 @@ function hasLineOfSight(
     )
     const id = hexId(coordinate)
     const hex = scenario.hexes.find((candidate) => candidate.id === id)
-    if (
-      !hex ||
-      scenario.battleRules.terrain[hex.terrain].blocksLineOfSight ||
-      occupied.has(id)
-    ) {
-      return false
+    if (!hex) return `Line of sight is blocked by the board edge at ${id}.`
+    if (scenario.battleRules.terrain[hex.terrain].blocksLineOfSight) {
+      return `Line of sight is blocked by ${hex.terrain} at ${id}.`
+    }
+    const blockingUnit = battle.units.find(
+      (unit) =>
+        unit.id !== attacker.id &&
+        unit.id !== target.id &&
+        hexId(unit) === id,
+    )
+    if (blockingUnit) {
+      return `Line of sight is blocked by ${blockingUnit.name} at ${id}.`
     }
   }
-  return true
+  return null
+}
+
+export interface AttackTargetStatus {
+  readonly legal: boolean
+  readonly reason: string | null
+}
+
+export function getAttackTargetStatus(
+  battle: BattleState,
+  attackerId: string,
+  targetId: string,
+  scenario: BattlefieldScenario,
+): AttackTargetStatus {
+  if (battle.phase !== 'active') {
+    return { legal: false, reason: 'The battle is not active.' }
+  }
+  const attacker = battle.units.find(({ id }) => id === attackerId)
+  if (!attacker || attacker.owner !== battle.activePlayerId) {
+    return { legal: false, reason: 'Only an active-player unit may attack.' }
+  }
+  const target = battle.units.find(({ id }) => id === targetId)
+  if (!target || target.currentHp <= 0) {
+    return { legal: false, reason: 'The target is not a living unit.' }
+  }
+  if (target.owner === attacker.owner) {
+    return { legal: false, reason: 'A unit cannot attack an ally.' }
+  }
+  if (
+    attacker.combatApRemaining < scenario.battleRules.attackApCost
+  ) {
+    return { legal: false, reason: 'The attacker has no combat AP remaining.' }
+  }
+  const distance = hexDistance(attacker, target)
+  const attackRange =
+    attacker.combat?.attackRange ?? scenario.battleRules.defaultAttackRange
+  if (distance < 1 || distance > attackRange) {
+    return {
+      legal: false,
+      reason: `Target is out of range (${distance} hexes; range ${attackRange}).`,
+    }
+  }
+  const blocker = lineOfSightBlocker(attacker, target, battle, scenario)
+  if (blocker) return { legal: false, reason: blocker }
+  return { legal: true, reason: null }
 }
 
 export function getAttackTargets(
@@ -376,24 +426,9 @@ export function getAttackTargets(
 ): readonly string[] {
   if (battle.phase !== 'active') return []
   const attacker = battle.units.find(({ id }) => id === unitId)
-  if (
-    !attacker ||
-    attacker.owner !== battle.activePlayerId ||
-    attacker.combatApRemaining < scenario.battleRules.attackApCost
-  ) {
-    return []
-  }
-  const attackRange =
-    attacker.combat?.attackRange ?? scenario.battleRules.defaultAttackRange
+  if (!attacker) return []
   return battle.units
-    .filter(
-      (target) =>
-        target.owner !== attacker.owner &&
-        target.currentHp > 0 &&
-        hexDistance(attacker, target) >= 1 &&
-        hexDistance(attacker, target) <= attackRange &&
-        hasLineOfSight(attacker, target, battle, scenario),
-    )
+    .filter(({ id }) => getAttackTargetStatus(battle, unitId, id, scenario).legal)
     .map(({ id }) => id)
 }
 
@@ -502,8 +537,20 @@ export function attackUnit(
   if (!attacker || attacker.owner !== battle.activePlayerId) {
     return { state: battle, error: 'Only an active-player unit may attack.' }
   }
-  if (!target || !getAttackTargets(battle, attackerId, scenario).includes(targetId)) {
+  if (!target) {
     return { state: battle, error: 'That unit is not a legal attack target.' }
+  }
+  const targetStatus = getAttackTargetStatus(
+    battle,
+    attackerId,
+    targetId,
+    scenario,
+  )
+  if (!targetStatus.legal) {
+    return {
+      state: battle,
+      error: `That unit is not a legal attack target. ${targetStatus.reason ?? ''}`.trim(),
+    }
   }
   const attackerHex = hexFor(attacker, scenario)
   const targetHex = hexFor(target, scenario)
@@ -662,6 +709,7 @@ export function restartBattle(
     battle.initialUnits,
     {
       ...scenario,
+      startingPlayerPolicy: 'configured',
       battleRules: {
         ...scenario.battleRules,
           startingPlayerId: battle.initialStartingPlayerId,

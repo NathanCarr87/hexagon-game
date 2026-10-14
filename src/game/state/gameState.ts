@@ -1,4 +1,9 @@
 import type { BattlefieldScenario } from '../domain/types'
+import { getScenarioById, scenarios } from '../scenarios'
+import {
+  validateScenario,
+  validateScenarioCatalog,
+} from '../scenarios/validateScenario'
 import { hexId } from '../hex/coordinates'
 import { validateDeployment } from './deployment'
 import {
@@ -11,6 +16,7 @@ import {
 } from './battle'
 
 export interface GameState {
+  readonly scenario: BattlefieldScenario
   readonly selectedUnitId: string | null
   readonly selectedHexId: string | null
   readonly units: BattlefieldScenario['units']
@@ -23,6 +29,7 @@ export interface GameState {
 }
 
 export type GameAction =
+  | { readonly type: 'select-scenario'; readonly scenarioId: string }
   | { readonly type: 'select-unit'; readonly unitId: string }
   | { readonly type: 'select-hex'; readonly hexId: string }
   | {
@@ -33,6 +40,7 @@ export type GameAction =
   | { readonly type: 'commit-deployment' }
   | { readonly type: 'start-battle' }
   | { readonly type: 'restart-battle' }
+  | { readonly type: 'return-to-setup' }
   | { readonly type: 'set-battle-action'; readonly mode: GameState['battleActionMode'] }
   | { readonly type: 'move-unit'; readonly unitId: string; readonly hexId: string }
   | { readonly type: 'attack-unit'; readonly attackerId: string; readonly targetId: string }
@@ -44,6 +52,7 @@ export function createInitialGameState(
 ): GameState {
   const firstUnit = scenario.units[0]
   return {
+    scenario,
     selectedUnitId: firstUnit?.id ?? null,
     selectedHexId: firstUnit ? hexId(firstUnit) : null,
     units: scenario.units.map((unit) => ({ ...unit })),
@@ -59,13 +68,44 @@ export function createInitialGameState(
 export function gameReducer(
   state: GameState,
   action: GameAction,
-  scenario: BattlefieldScenario,
+  scenario: BattlefieldScenario = state.scenario,
 ): GameState {
+  if (action.type === 'select-scenario') {
+    if (state.battle) return state
+    const catalogError = validateScenarioCatalog(scenarios)[0]
+    if (catalogError) return { ...state, battleMessage: catalogError }
+    const nextScenario = getScenarioById(action.scenarioId)
+    return nextScenario && nextScenario.id !== state.scenario.id
+      ? createInitialGameState(nextScenario)
+      : state
+  }
   if (action.type === 'reset') {
-    return createInitialGameState(scenario)
+    return createInitialGameState(state.scenario)
+  }
+  if (action.type === 'return-to-setup') {
+    if (!state.battle) return state
+    const firstUnit = state.units[0]
+    return {
+      ...state,
+      mode: 'deployment',
+      battle: null,
+      battleActionMode: 'select',
+      battleMessage: null,
+      selectedUnitId: firstUnit?.id ?? null,
+      selectedHexId: firstUnit ? hexId(firstUnit) : null,
+      deploymentTargetHexId: null,
+      deploymentError: null,
+    }
   }
   if (action.type === 'start-battle') {
     if (state.battle || state.mode === 'battle') return state
+    const scenarioErrors = [
+      ...validateScenarioCatalog(scenarios),
+      ...validateScenario(scenario),
+    ]
+    if (scenarioErrors.length > 0) {
+      return { ...state, battleMessage: scenarioErrors[0] ?? null }
+    }
     const { battle, error } = createBattle(state.units, scenario)
     return battle
       ? {

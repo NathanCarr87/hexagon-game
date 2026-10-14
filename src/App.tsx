@@ -1,5 +1,6 @@
 import { useReducer } from 'react'
 import { initialScenario } from './game/scenarios/initialScenario'
+import { scenarios } from './game/scenarios'
 import { createInitialGameState, gameReducer } from './game/state/gameState'
 import type { GameAction, GameState } from './game/state/gameState'
 import { Battlefield } from './game/scene/Battlefield'
@@ -9,24 +10,22 @@ import { ForceSetupPanel } from './game/ui/ForceSetupPanel'
 import { BattlePanel } from './game/ui/BattlePanel'
 import { getAttackTargets, getMovementDestinations } from './game/state/battle'
 
-const scenarioReducer = (state: GameState, action: GameAction): GameState =>
-  gameReducer(state, action, initialScenario)
-
 function App() {
   const [gameState, dispatch] = useReducer(
-    scenarioReducer,
+    (state: GameState, action: GameAction) => gameReducer(state, action),
     initialScenario,
     createInitialGameState,
   )
+  const scenario = gameState.scenario
   const activeUnits = gameState.battle?.units ?? gameState.units
-  const selectedHex = initialScenario.hexes.find(
+  const selectedHex = scenario.hexes.find(
     (hex) => hex.id === gameState.selectedHexId,
   )
   const selectedUnit = activeUnits.find(
     (unit) => unit.id === gameState.selectedUnitId,
   )
   const eligibleHexIds = gameState.mode !== 'battle' && selectedUnit
-    ? initialScenario.setup.deploymentZones.find(
+    ? scenario.setup.deploymentZones.find(
         ({ owner }) => owner === selectedUnit.owner,
       )?.hexIds ?? []
     : []
@@ -38,12 +37,12 @@ function App() {
       ? getMovementDestinations(
           gameState.battle,
           selectedUnit.id,
-          initialScenario,
+          scenario,
         ).map(({ hexId }) => hexId)
       : []
   const attackUnitIds =
     gameState.battle && selectedUnit
-      ? getAttackTargets(gameState.battle, selectedUnit.id, initialScenario)
+      ? getAttackTargets(gameState.battle, selectedUnit.id, scenario)
       : []
   const attackHexIds = attackUnitIds
     .map((unitId) => activeUnits.find(({ id }) => id === unitId))
@@ -70,11 +69,31 @@ function App() {
 
       <section className="battle-header" aria-label="Scenario">
         <div>
-          <p className="eyebrow">FIELD STUDY&nbsp; / &nbsp;01</p>
-          <h1>{initialScenario.title}</h1>
-          <p className="scenario-subtitle">{initialScenario.subtitle}</p>
+          <p className="eyebrow">FIELD STUDY&nbsp; / &nbsp;SCENARIO</p>
+          <h1>{scenario.title}</h1>
+          <p className="scenario-subtitle">{scenario.description}</p>
         </div>
         <div className="header-actions">
+          <label className="scenario-picker">
+            <span>Scenario</span>
+            <select
+              aria-label="Choose scenario"
+              disabled={Boolean(gameState.battle)}
+              onChange={(event) =>
+                dispatch({
+                  type: 'select-scenario',
+                  scenarioId: event.currentTarget.value,
+                })
+              }
+              value={scenario.id}
+            >
+              {scenarios.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="control-button"
             onClick={() => dispatch({ type: 'reset' })}
@@ -89,7 +108,7 @@ function App() {
         <div className="battlefield-column">
           <div className="scene-frame">
             <Battlefield
-              scenario={initialScenario}
+              scenario={scenario}
               units={activeUnits}
               selectedHexId={gameState.selectedHexId}
               selectedUnitId={gameState.selectedUnitId}
@@ -142,12 +161,12 @@ function App() {
                   : gameState.mode === 'battle'
                     ? `BATTLE · ROUND ${gameState.battle?.round ?? 1}`
                     : 'AXIAL GRID'}
-                &nbsp; / &nbsp;{initialScenario.hexes.length} HEXES
+                &nbsp; / &nbsp;{scenario.hexes.length} HEXES
               </span>
               <span>DRAG TO ORBIT&nbsp; · &nbsp;SCROLL TO ZOOM</span>
             </div>
           </div>
-          <TerrainLegend players={initialScenario.playerDefinitions} />
+          <TerrainLegend scenario={scenario} />
         </div>
 
         <aside className="sidebar" aria-label="Battlefield information">
@@ -155,7 +174,7 @@ function App() {
             unit={selectedUnit}
             hex={selectedHex}
             ownerColor={
-              initialScenario.playerDefinitions.find(
+              scenario.playerDefinitions.find(
                 ({ id }) => id === selectedUnit?.owner,
               )?.color
             }
@@ -167,7 +186,7 @@ function App() {
           />
           {gameState.mode === 'battle' ? (
             <BattlePanel
-              scenario={initialScenario}
+              scenario={scenario}
               units={gameState.battle?.units ?? gameState.units}
               battle={gameState.battle}
               selectedUnitId={gameState.selectedUnitId}
@@ -178,21 +197,19 @@ function App() {
           ) : (
             <>
               <ForceSetupPanel
-                scenario={initialScenario}
+                scenario={scenario}
                 state={gameState}
                 dispatch={dispatch}
               />
-              {gameState.mode === 'inspection' && (
-                <BattlePanel
-                  scenario={initialScenario}
-                  units={gameState.units}
-                  battle={null}
-                  selectedUnitId={gameState.selectedUnitId}
-                  actionMode={gameState.battleActionMode}
-                  message={gameState.battleMessage}
-                  dispatch={dispatch}
-                />
-              )}
+              <BattlePanel
+                scenario={scenario}
+                units={gameState.units}
+                battle={null}
+                selectedUnitId={gameState.selectedUnitId}
+                actionMode={gameState.battleActionMode}
+                message={gameState.battleMessage}
+                dispatch={dispatch}
+              />
             </>
           )}
           <p className="temporary-note">
