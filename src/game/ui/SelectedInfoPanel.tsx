@@ -1,7 +1,12 @@
-import type { BattlefieldHex, ScenarioUnit } from '../domain/types'
+import type {
+  BattlefieldHex,
+  ScenarioUnit,
+  UnitDefinition,
+} from '../domain/types'
 
 interface SelectedInfoPanelProps {
   readonly unit: ScenarioUnit | undefined
+  readonly definition: UnitDefinition | undefined
   readonly hex: BattlefieldHex | undefined
   readonly ownerColor: string | undefined
   readonly combatApRemaining?: number
@@ -9,6 +14,7 @@ interface SelectedInfoPanelProps {
 
 export function SelectedInfoPanel({
   unit,
+  definition,
   hex,
   ownerColor,
   combatApRemaining,
@@ -22,7 +28,15 @@ export function SelectedInfoPanel({
       {unit ? (
         <>
           <p className="unit-name">{unit.name}</p>
-          <p className="unit-type">{unit.unitType.replaceAll('-', ' ')}</p>
+          <p className="unit-type">
+            {definition?.displayName ?? 'Unknown definition'}
+          </p>
+          {definition && (
+            <>
+              <p className="deployment-rules">{definition.role}</p>
+              <p className="deployment-rules">{definition.description}</p>
+            </>
+          )}
           <div className="unit-owner">
             <span
               className="owner-swatch"
@@ -38,7 +52,7 @@ export function SelectedInfoPanel({
               <span>HP</span>
               <strong>
                 {unit.currentHp}
-                <small> / {unit.maxHp}</small>
+                <small> / {definition?.combat.maxHealth ?? '?'}</small>
               </strong>
             </div>
             <div className="vital">
@@ -46,16 +60,29 @@ export function SelectedInfoPanel({
               <strong>{combatApRemaining ?? unit.actionPointsRemaining}</strong>
             </div>
           </div>
-          <div className="stats-list" aria-label="Temporary unit stats">
-            {Object.entries(unit.stats).map(([name, value]) => (
-              <div className="stat-row" key={name}>
-                <span>{name}</span>
-                <span className="stat-track">
-                  <span style={{ width: `${Math.min(value * 18, 100)}%` }} />
-                </span>
-                <strong>{value}</strong>
+          <div className="stats-list" aria-label="Unit combat attributes">
+            {definition &&
+              (
+                [
+                  ['Power', definition.combat.power],
+                  ['Guard', definition.combat.guard],
+                  ['Mobility', definition.combat.mobility],
+                ] as const
+              ).map(([name, value]) => (
+                <div className="stat-row" key={name}>
+                  <span>{name}</span>
+                  <span className="stat-track">
+                    <span style={{ width: `${Math.min(value * 18, 100)}%` }} />
+                  </span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            {definition?.combat.attackRange !== undefined && (
+              <div className="stat-row">
+                <span>Attack range</span>
+                <strong>{definition.combat.attackRange}</strong>
               </div>
-            ))}
+            )}
           </div>
         </>
       ) : hex ? (

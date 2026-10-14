@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { BattlefieldScenario } from '../domain/types'
 import { openGroundScenario } from './openGround'
 import { initialScenario } from './initialScenario'
 import { scenarios } from './index'
@@ -122,6 +123,50 @@ describe('scenario definitions', () => {
     }
     expect(validateScenario(invalid)).toContain(
       'Ironwatch-01 is placed on terrain marked impassable by this scenario.',
+    )
+  })
+
+  it('rejects unknown definitions and refuses development fixtures in authoritative scenarios', () => {
+    const unknownDefinition = {
+      ...initialScenario,
+      units: initialScenario.units.map((unit, index) =>
+        index === 0 ? { ...unit, definitionId: 'missing-definition' } : unit,
+      ),
+    }
+    expect(validateScenario(unknownDefinition)).toContain(
+      'Ironwatch-01 references unknown unit definition missing-definition.',
+    )
+
+    const falselyAuthoritative = {
+      ...initialScenario,
+      dataStatus: 'authoritative' as const,
+    }
+    expect(validateScenario(falselyAuthoritative)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/is development-fixture, not authoritative/),
+      ]),
+    )
+    expect(
+      createBattle(
+        falselyAuthoritative.units,
+        falselyAuthoritative,
+      ).battle,
+    ).toBeNull()
+  })
+
+  it('reports malformed definition combat data without throwing', () => {
+    const malformed = {
+      ...initialScenario,
+      unitDefinitions: initialScenario.unitDefinitions.map((definition, index) =>
+        index === 0 ? { ...definition, combat: null } : definition,
+      ),
+    } as BattlefieldScenario
+
+    expect(() => validateScenario(malformed)).not.toThrow()
+    expect(validateScenario(malformed)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/needs positive finite maximum health/),
+      ]),
     )
   })
 

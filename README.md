@@ -18,7 +18,9 @@ Run the unit tests with `npm test`, and create a production build with
 - `src/game/hex/` contains pure axial-coordinate and pointy-top world geometry
   utilities.
 - `src/game/domain/` defines scenario, terrain, region, objective, and unit data
-  contracts without depending on React or Three.js.
+  contracts without depending on React or Three.js. `unitCatalog.ts` defines
+  the unit-definition schema and catalog validation; its authoritative catalog
+  remains empty until game-design inputs are supplied.
 - `src/game/scenarios/` provides the selectable scenario registry, deterministic
   scenario definitions, and rendering-independent scenario validation.
 - `src/game/state/` owns immutable setup, deployment, battle lifecycle,
@@ -44,9 +46,10 @@ or Open Ground, inspect and deploy its scenario roster, start a battle, return
 to setup, or reset the selected scenario. Scenario validation runs before
 battle start.
 
-Force construction remains intentionally unavailable: this repository has no
-authoritative stat costs, pricing formula, construction constraints, prefab
-definitions, or army budget. Current rosters and deployment zones are
-scenario-provided provisional test data, not constructed forces or templates.
-Configured scenario budgets are rejected until they can be validated against
-an authoritative pricing service.
+All current scenario units are marked development fixtures. Their HP, Power,
+Guard, Mobility, and visual archetypes are centralized in the development unit
+catalog, not treated as authoritative definitions. The repository contains no
+authoritative pricing formula or stat costs, construction constraints, prefab
+definitions, or army budget. Force construction and cost calculation therefore
+remain unavailable; configured scenario budgets are rejected rather than
+estimated.

@@ -1,5 +1,6 @@
 import type { BattlefieldScenario } from '../domain/types'
 import type { GameAction, GameState } from '../state/gameState'
+import { getUnitDefinition } from '../domain/unitCatalog'
 
 interface ForceSetupPanelProps {
   readonly scenario: BattlefieldScenario
@@ -24,12 +25,13 @@ export function ForceSetupPanel({
       <section className="panel setup-panel" aria-labelledby="construction-title">
         <div className="panel-heading">
           <h2 id="construction-title">Force rosters</h2>
-          <span className="setup-status">RULES NEEDED</span>
+          <span className="setup-status">DEVELOPMENT FIXTURES</span>
         </div>
         <p className="setup-message">
-          These scenario-provided units are provisional presets, not a priced
-          template catalog. Force editing and cost validation stay unavailable
-          until authoritative unit pricing and construction rules are supplied.
+          No authoritative unit definitions are available. The pricing formula,
+          stat costs, prefab templates, and construction rules are also
+          unspecified, so these development fixtures cannot be purchased or
+          edited.
         </p>
         <p className="deployment-rules">
           Recommended: {scenario.recommendedForceSize}. No budget is configured.
@@ -55,25 +57,35 @@ export function ForceSetupPanel({
                 Total cost <strong>Unavailable — no pricing rules</strong>
               </p>
               <ul className="starting-units">
-                {roster.map((unit) => (
-                  <li key={unit.id}>
-                    <button
-                      className={`starting-unit${selectedUnit?.id === unit.id ? ' selected' : ''}`}
-                      onClick={() =>
-                        dispatch({ type: 'select-unit', unitId: unit.id })
-                      }
-                      type="button"
-                    >
-                      <span>
-                        <strong>{unit.name}</strong>
-                        <small>{unit.unitType.replaceAll('-', ' ')}</small>
-                      </span>
-                      <span className="starting-unit-coordinate">
-                        q{unit.q} / r{unit.r}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                {roster.map((unit) => {
+                  const definition = getUnitDefinition(
+                    scenario.unitDefinitions,
+                    unit.definitionId,
+                  )
+                  return (
+                    <li key={unit.id}>
+                      <button
+                        className={`starting-unit${selectedUnit?.id === unit.id ? ' selected' : ''}`}
+                        onClick={() =>
+                          dispatch({ type: 'select-unit', unitId: unit.id })
+                        }
+                        type="button"
+                      >
+                        <span>
+                          <strong>{unit.name}</strong>
+                          <small>
+                            {definition
+                              ? `${definition.displayName} — ${definition.role}`
+                              : 'Unknown unit definition'}
+                          </small>
+                        </span>
+                        <span className="starting-unit-coordinate">
+                          q{unit.q} / r{unit.r}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )

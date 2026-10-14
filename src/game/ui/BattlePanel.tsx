@@ -209,8 +209,9 @@ export function BattlePanel({
                     <p className={legal ? 'target-legal' : ''} key={unit.id}>
                       <span>{unit.name}</span>
                       <small>
-                        HP {unit.currentHp}/{unit.maxHp} · Power{' '}
-                        {unit.stats.Power} · Guard {unit.stats.Guard}
+                        HP {unit.currentHp}/{unit.definition.combat.maxHealth} · Power{' '}
+                        {unit.definition.combat.power} · Guard{' '}
+                        {unit.definition.combat.guard}
                       </small>
                       <small>{legal ? 'Valid target' : reason}</small>
                     </p>

@@ -5,6 +5,10 @@ import type {
   VictoryMode,
 } from '../domain/types'
 import { hexDistance, hexId } from '../hex/coordinates'
+import {
+  getUnitDefinition,
+  validateUnitCatalog,
+} from '../domain/unitCatalog'
 
 const TERRAIN_TYPES: readonly TerrainType[] = [
   'grassland',
@@ -68,6 +72,7 @@ export function validateScenario(
     [scenario.regions, 'Geographic regions'],
     [scenario.objectives, 'Objectives'],
     [scenario.units, 'Starting units'],
+    [scenario.unitDefinitions, 'Unit definitions'],
     [scenario.playerDefinitions, 'Player definitions'],
   ]
   for (const [value, label] of collections) {
@@ -94,9 +99,9 @@ export function validateScenario(
   }
   if (
     Array.isArray(scenario.units) &&
-    scenario.units.some((unit) => !isRecord(unit) || !isRecord(unit.stats))
+    scenario.units.some((unit) => !isRecord(unit))
   ) {
-    add('Starting units must define combat statistics objects.')
+    add('Starting units must be objects.')
   }
   if (
     !isRecord(scenario.setup) ||
@@ -154,8 +159,11 @@ export function validateScenario(
   ) {
     add('Board radius must be a positive integer.')
   }
-  if (scenario.dataStatus !== 'temporary-placeholder') {
-    add('Scenario data status is not supported.')
+  if (
+    scenario.dataStatus !== 'authoritative' &&
+    scenario.dataStatus !== 'development-fixture'
+  ) {
+    add('Scenario unit data status is not supported.')
   }
   if (scenario.setup.rulesStatus !== 'provisional') {
     add('Scenario setup rules status is not supported.')
@@ -166,6 +174,9 @@ export function validateScenario(
   ) {
     add('Setup must define repositioning and disallow multiple units per hex.')
   }
+  errors.push(
+    ...validateUnitCatalog(scenario.unitDefinitions, scenario.dataStatus),
+  )
 
   const hexById = new Map<string, BattlefieldHex>()
   const seenCoordinates = new Set<string>()
@@ -395,6 +406,26 @@ export function validateScenario(
     if (!playerIds.has(unit.owner)) {
       add(`${unit.name} references unknown player ${unit.owner}.`)
     }
+    const definition = getUnitDefinition(
+      scenario.unitDefinitions,
+      unit.definitionId,
+    )
+    if (!definition) {
+      add(`${unit.name} references unknown unit definition ${unit.definitionId}.`)
+    } else {
+      const maxHealth =
+        isRecord(definition.combat) &&
+        typeof definition.combat.maxHealth === 'number'
+          ? definition.combat.maxHealth
+          : undefined
+      if (
+        !Number.isFinite(unit.currentHp) ||
+        unit.currentHp <= 0 ||
+        (maxHealth !== undefined && unit.currentHp > maxHealth)
+      ) {
+        add(`${unit.name} has invalid health for definition ${definition.id}.`)
+      }
+    }
     const coordinateIsValid = Number.isInteger(unit.q) && Number.isInteger(unit.r)
     const id = coordinateIsValid ? hexId(unit) : ''
     if (!coordinateIsValid || !hexById.has(id)) {
@@ -412,22 +443,6 @@ export function validateScenario(
       scenario.battleRules.terrain[unitHex.terrain]?.movementCost === null
     ) {
       add(`${unit.name} is placed on terrain marked impassable by this scenario.`)
-    }
-    if (
-      !Number.isFinite(unit.currentHp) ||
-      unit.currentHp <= 0 ||
-      !Number.isFinite(unit.maxHp) ||
-      unit.maxHp < unit.currentHp
-    ) {
-      add(`${unit.name} has invalid starting health.`)
-    }
-    for (const stat of ['Power', 'Guard', 'Mobility']) {
-      if (!Number.isFinite(unit.stats[stat])) {
-        add(`${unit.name} needs a finite ${stat} combat value.`)
-      }
-    }
-    if (Number.isFinite(unit.stats.Mobility) && unit.stats.Mobility <= 0) {
-      add(`${unit.name} must have positive Mobility to move.`)
     }
     if (
       !Number.isFinite(unit.actionPointsRemaining) ||

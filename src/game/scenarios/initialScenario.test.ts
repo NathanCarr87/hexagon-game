@@ -38,7 +38,7 @@ describe('initial battlefield scenario', () => {
         cellIds.has(hexId(objective)),
       ),
     ).toBe(true)
-    expect(initialScenario.dataStatus).toBe('temporary-placeholder')
+    expect(initialScenario.dataStatus).toBe('development-fixture')
   })
 
   it('keeps setup zones explicitly provisional and matches starting ownership', () => {

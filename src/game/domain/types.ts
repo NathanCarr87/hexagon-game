@@ -70,18 +70,35 @@ export interface ScenarioSetup {
   readonly deploymentZones: readonly DeploymentZone[]
 }
 
+export type UnitDefinitionStatus = 'authoritative' | 'development-fixture'
+
+export type UnitVisualArchetype = 'line-infantry' | 'scout'
+
+export interface UnitDefinition {
+  readonly id: string
+  readonly displayName: string
+  readonly description: string
+  readonly role: string
+  readonly status: UnitDefinitionStatus
+  readonly combat: {
+    readonly maxHealth: number
+    readonly power: number
+    readonly guard: number
+    readonly mobility: number
+    readonly attackRange?: number
+  }
+  readonly presentation: {
+    readonly archetype: UnitVisualArchetype
+  }
+}
+
 export interface ScenarioUnit extends AxialCoordinate {
   readonly id: string
   readonly name: string
+  readonly definitionId: string
   readonly owner: string
-  readonly unitType: string
   readonly currentHp: number
-  readonly maxHp: number
-  readonly stats: Readonly<Record<string, number>>
   readonly actionPointsRemaining: number
-  readonly combat?: {
-    readonly attackRange?: number
-  }
 }
 
 export interface BattlefieldScenario {
@@ -91,10 +108,11 @@ export interface BattlefieldScenario {
   readonly subtitle: string
   readonly recommendedForceSize: string
   readonly boardRadius: number
-  readonly dataStatus: 'temporary-placeholder'
+  readonly dataStatus: 'authoritative' | 'development-fixture'
   readonly hexes: readonly BattlefieldHex[]
   readonly regions: readonly ScenarioRegion[]
   readonly objectives: readonly ScenarioObjective[]
+  readonly unitDefinitions: readonly UnitDefinition[]
   readonly units: readonly ScenarioUnit[]
   readonly players: readonly string[]
   readonly playerDefinitions: readonly ScenarioPlayer[]

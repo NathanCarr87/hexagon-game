@@ -36,7 +36,10 @@ describe('App', () => {
     ).toBeInTheDocument()
     expect(screen.getByTestId('battlefield')).toBeInTheDocument()
     expect(screen.getAllByText('Ironwatch-01').length).toBeGreaterThan(0)
-    expect(screen.getByText(/unit pricing and construction rules/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Line Infantry/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/pricing formula, stat costs, prefab templates/i)).toBeInTheDocument()
+    expect(screen.getByText('DEVELOPMENT FIXTURES')).toBeInTheDocument()
+    expect(screen.getByText(/no authoritative unit definitions are available/i)).toBeInTheDocument()
     expect(screen.getByText(/temporary scenario data/i)).toBeInTheDocument()
   })
 

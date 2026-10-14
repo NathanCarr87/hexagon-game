@@ -6,9 +6,11 @@ import type {
   BattlefieldHex,
   BattlefieldScenario,
   ScenarioUnit,
+  UnitDefinition,
 } from '../domain/types'
 import { axialToWorld } from '../hex/coordinates'
 import { TERRAIN_APPEARANCE } from './terrainAppearance'
+import { getUnitDefinition } from '../domain/unitCatalog'
 
 interface BattlefieldProps {
   readonly scenario: BattlefieldScenario
@@ -225,6 +227,7 @@ function ObjectiveMarker({
 
 function UnitFigure({
   unit,
+  definition,
   selected,
   hex,
   ownerColor,
@@ -232,6 +235,7 @@ function UnitFigure({
   onSelect,
 }: {
   readonly unit: ScenarioUnit
+  readonly definition: UnitDefinition
   readonly selected: boolean
   readonly hex: BattlefieldHex
   readonly ownerColor: string
@@ -241,7 +245,7 @@ function UnitFigure({
   const position = axialToWorld(unit)
   const color = ownerColor
   const y = elevationAt(hex) + 0.07
-  const scout = unit.unitType === 'scout'
+  const scout = definition.presentation.archetype === 'scout'
   return (
     <group
       position={[position.x, y, position.z]}
@@ -422,11 +426,16 @@ function BattlefieldScene({
       })}
       {units.map((unit) => {
         const unitHex = hexById.get(`hex:${unit.q},${unit.r}`)
-        if (!unitHex) return null
+        const definition = getUnitDefinition(
+          scenario.unitDefinitions,
+          unit.definitionId,
+        )
+        if (!unitHex || !definition) return null
         return (
           <UnitFigure
             key={unit.id}
             unit={unit}
+            definition={definition}
             hex={unitHex}
             ownerColor={
               scenario.playerDefinitions.find(
@@ -449,12 +458,16 @@ function BattlefieldScene({
       {deploymentTargetHexId && selectedUnitId && (() => {
         const unit = units.find(({ id }) => id === selectedUnitId)
         const targetHex = hexById.get(deploymentTargetHexId)
-        if (!unit || !targetHex) return null
+        const definition = unit
+          ? getUnitDefinition(scenario.unitDefinitions, unit.definitionId)
+          : undefined
+        if (!unit || !definition || !targetHex) return null
         const previewUnit = { ...unit, q: targetHex.q, r: targetHex.r }
         return (
           <UnitFigure
             key={`preview:${unit.id}`}
             unit={previewUnit}
+            definition={definition}
             hex={targetHex}
             ownerColor={
               scenario.playerDefinitions.find(

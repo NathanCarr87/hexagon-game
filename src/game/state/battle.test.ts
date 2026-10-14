@@ -3,6 +3,7 @@ import type {
   BattlefieldScenario,
   ScenarioBattleRules,
   ScenarioUnit,
+  UnitDefinition,
 } from '../domain/types'
 import { hexId } from '../hex/coordinates'
 import { initialScenario } from '../scenarios/initialScenario'
@@ -24,6 +25,8 @@ function scenarioWith(
   rules: Partial<ScenarioBattleRules> = {},
   terrain: Partial<ScenarioBattleRules['terrain']> = {},
   objectives = initialScenario.objectives,
+  unitDefinitions: readonly UnitDefinition[] =
+    initialScenario.unitDefinitions,
 ): BattlefieldScenario {
   const allHexIds = initialScenario.hexes.map(({ id }) => id)
   const occupiedHexIds = new Set(units.map((unit) => hexId(unit)))
@@ -37,6 +40,7 @@ function scenarioWith(
     ),
     units,
     objectives,
+    unitDefinitions,
     setup: {
       ...initialScenario.setup,
       deploymentZones: initialScenario.players.map((owner) => ({
@@ -393,12 +397,22 @@ describe('battle attacks', () => {
       { q: -3, r: 2 },
       { q: 1, r: 0 },
       { q: 3, r: 0 },
-    ]).map((unit) =>
-      unit.id === 'unit-ironwatch-01'
-        ? { ...unit, combat: { attackRange: 3 } }
-        : unit,
+    ])
+    const unitDefinitions = initialScenario.unitDefinitions.map((definition) =>
+      definition.id === 'development.line-infantry'
+        ? {
+            ...definition,
+            combat: { ...definition.combat, attackRange: 3 },
+          }
+        : definition,
     )
-    const scenario = scenarioWith(units)
+    const scenario = scenarioWith(
+      units,
+      {},
+      {},
+      initialScenario.objectives,
+      unitDefinitions,
+    )
     const withHill = {
       ...scenario,
       hexes: scenario.hexes.map((hex) =>
@@ -418,7 +432,7 @@ describe('battle attacks', () => {
       { q: 3, r: 0 },
     ]).map((unit) =>
       unit.id === 'unit-ashfall-01'
-        ? { ...unit, currentHp: 1, maxHp: 8 }
+        ? { ...unit, currentHp: 1 }
         : unit,
     )
     const scenario = scenarioWith(units)
@@ -453,12 +467,32 @@ describe('battle attacks', () => {
       { q: 3, r: 0 },
     ]).map((unit) =>
       unit.id === 'unit-ironwatch-01'
-        ? { ...unit, stats: { ...unit.stats, Power: 1 } }
+        ? { ...unit, definitionId: 'test.low-power' }
         : unit.id === 'unit-ashfall-01'
-          ? { ...unit, stats: { ...unit.stats, Guard: 5 } }
+          ? { ...unit, definitionId: 'test.high-guard' }
           : unit,
     )
-    const scenario = scenarioWith(units)
+    const lineInfantry = initialScenario.unitDefinitions[0]!
+    const unitDefinitions: UnitDefinition[] = [
+      ...initialScenario.unitDefinitions,
+      {
+        ...lineInfantry,
+        id: 'test.low-power',
+        combat: { ...lineInfantry.combat, power: 1 },
+      },
+      {
+        ...lineInfantry,
+        id: 'test.high-guard',
+        combat: { ...lineInfantry.combat, guard: 5 },
+      },
+    ]
+    const scenario = scenarioWith(
+      units,
+      {},
+      {},
+      initialScenario.objectives,
+      unitDefinitions,
+    )
     const attack = attackUnit(
       start(scenario),
       'unit-ironwatch-01',

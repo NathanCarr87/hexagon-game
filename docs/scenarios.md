@@ -9,21 +9,31 @@ objectives, starting-player policy, and victory configuration.
 | The Narrows | Hills, forests, water, and mountain restrictions around a central approach | Random player; deterministic tests inject the random source | Objective threshold or elimination |
 | Open Ground | Clear movement and attack lanes without terrain line-of-sight blockers | Blueward starts | Elimination |
 
-Both maps currently use the same two scenario-provided units per side so their
-combat data remains unchanged and explicitly provisional. They are not prefab
-templates. Use the Open Ground scenario for repeatable manual battle playback;
-domain tests use fixed scenario data and inject the starting-player random
-source when testing The Narrows.
+Both maps currently use the same two development-fixture unit definitions per
+side so their combat data remains explicitly provisional. The definitions are
+centralized in `src/game/domain/unitCatalog.ts`; the scenario rosters store
+stable definition IDs plus instance identity, owner, position, current health,
+and placeholder AP. They are not prefab templates. Use the Open Ground
+scenario for repeatable manual battle playback; domain tests use fixed scenario
+data and inject the starting-player random source when testing The Narrows.
 
 ## Setup limitations
 
-Scenario selection, roster inspection, deployment, battle start, reset, and
-return-to-setup are implemented. The repository does not contain an
-authoritative unit pricing formula, prefab catalog, configurable force
-construction rules, or point budgets. The setup UI therefore identifies these
-units as scenario presets and does not pretend to calculate force costs or
-allow unpriced force editing. A scenario with configured budgets is rejected
-until a pricing service is available to enforce them.
+Scenario selection, read-only roster inspection, deployment, battle start,
+reset, and return-to-setup are implemented. `authoritativeUnitCatalog` is
+intentionally empty. The repository does not contain authoritative unit
+definitions, a pricing formula or stat costs, prefab templates, documented
+construction constraints, or army budgets. The setup UI labels the current
+catalog entries as development fixtures and does not calculate costs or allow
+unpriced force editing. A scenario with configured budgets is rejected until
+authoritative pricing is available to enforce them.
+
+The canonical `UnitDefinition` schema separates immutable definition data
+(description, role, combat attributes, and visual archetype) from roster
+instances (stable instance ID, definition ID, owner, position, current health,
+and scenario placeholder AP). Pricing fields are intentionally absent until
+their authoritative inputs and rules are provided. No authoritative prefab
+templates or costs are available.
 
 Deployment remains limited to the selected unit's configured player zone,
 unoccupied hexes, and terrain the scenario marks as passable. An invalid

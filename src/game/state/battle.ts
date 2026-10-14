@@ -3,6 +3,7 @@ import type {
   BattlefieldHex,
   ScenarioUnit,
   TerrainType,
+  UnitDefinition,
 } from '../domain/types'
 import {
   hexDistance,
@@ -11,8 +12,10 @@ import {
   type AxialCoordinate,
 } from '../hex/coordinates'
 import { validateScenario } from '../scenarios/validateScenario'
+import { getUnitDefinition } from '../domain/unitCatalog'
 
 export interface CombatUnit extends ScenarioUnit {
+  readonly definition: UnitDefinition
   readonly combatApRemaining: number
 }
 
@@ -122,31 +125,22 @@ export function validateBattleSetup(
     if (!hexes.has(id)) return `${unit.name} is not deployed on the battlefield.`
     if (unitIds.has(unit.id)) return `Unit identity ${unit.id} is duplicated.`
     unitIds.add(unit.id)
+    const definition = getUnitDefinition(
+      scenario.unitDefinitions,
+      unit.definitionId,
+    )
+    if (!definition || definition.status !== scenario.dataStatus) {
+      return `${unit.name} does not reference a valid ${scenario.dataStatus} unit definition.`
+    }
     if (
       !Number.isFinite(unit.currentHp) ||
       unit.currentHp <= 0 ||
-      !Number.isFinite(unit.maxHp) ||
-      unit.maxHp < unit.currentHp
+      unit.currentHp > definition.combat.maxHealth
     ) {
       return `${unit.name} has invalid starting health.`
     }
     if (!scenario.players.includes(unit.owner)) {
       return `${unit.name} has an owner not configured for this scenario.`
-    }
-    if (
-      !Number.isFinite(unit.stats.Mobility) ||
-      unit.stats.Mobility <= 0 ||
-      !Number.isFinite(unit.stats.Power) ||
-      !Number.isFinite(unit.stats.Guard)
-    ) {
-      return `${unit.name} is missing valid provisional combat statistics.`
-    }
-    if (
-      unit.combat?.attackRange !== undefined &&
-      (!Number.isInteger(unit.combat.attackRange) ||
-        unit.combat.attackRange < 1)
-    ) {
-      return `${unit.name} has an invalid attack range.`
     }
     if (occupied.has(id)) return `More than one unit occupies ${id}.`
     occupied.add(id)
@@ -197,6 +191,7 @@ export function createBattle(
     activePlayerId: startingPlayerId,
     units: units.map((unit) => ({
       ...unit,
+      definition: getUnitDefinition(scenario.unitDefinitions, unit.definitionId)!,
       combatApRemaining:
         unit.owner === startingPlayerId
           ? scenario.battleRules.combatApPerTurn
@@ -245,7 +240,7 @@ export function getMovementDestinations(
   ) {
     return []
   }
-  const mobility = unit.stats.Mobility
+  const mobility = unit.definition.combat.mobility
   if (!Number.isFinite(mobility) || mobility <= 0) return []
   const occupied = new Set(
     battle.units
@@ -409,7 +404,8 @@ export function getAttackTargetStatus(
   }
   const distance = hexDistance(attacker, target)
   const attackRange =
-    attacker.combat?.attackRange ?? scenario.battleRules.defaultAttackRange
+    attacker.definition.combat.attackRange ??
+    scenario.battleRules.defaultAttackRange
   if (distance < 1 || distance > attackRange) {
     return {
       legal: false,
@@ -574,8 +570,8 @@ export function attackUnit(
     terrainElevation(targetHex.terrain, scenario)
       ? 1
       : 0
-  const power = attacker.stats.Power
-  const guard = target.stats.Guard
+  const power = attacker.definition.combat.power
+  const guard = target.definition.combat.guard
   if (!Number.isFinite(power) || !Number.isFinite(guard)) {
     return { state: battle, error: 'Attack requires configured Power and Guard.' }
   }

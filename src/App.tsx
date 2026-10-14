@@ -9,6 +9,7 @@ import { TerrainLegend } from './game/ui/TerrainLegend'
 import { ForceSetupPanel } from './game/ui/ForceSetupPanel'
 import { BattlePanel } from './game/ui/BattlePanel'
 import { getAttackTargets, getMovementDestinations } from './game/state/battle'
+import { getUnitDefinition } from './game/domain/unitCatalog'
 
 function App() {
   const [gameState, dispatch] = useReducer(
@@ -24,6 +25,9 @@ function App() {
   const selectedUnit = activeUnits.find(
     (unit) => unit.id === gameState.selectedUnitId,
   )
+  const selectedDefinition = selectedUnit
+    ? getUnitDefinition(scenario.unitDefinitions, selectedUnit.definitionId)
+    : undefined
   const eligibleHexIds = gameState.mode !== 'battle' && selectedUnit
     ? scenario.setup.deploymentZones.find(
         ({ owner }) => owner === selectedUnit.owner,
@@ -172,6 +176,7 @@ function App() {
         <aside className="sidebar" aria-label="Battlefield information">
           <SelectedInfoPanel
             unit={selectedUnit}
+            definition={selectedDefinition}
             hex={selectedHex}
             ownerColor={
               scenario.playerDefinitions.find(

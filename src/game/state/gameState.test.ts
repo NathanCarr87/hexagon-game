@@ -208,6 +208,45 @@ describe('scenario setup state', () => {
     ).toMatchObject({ q: -2, r: 0, combatApRemaining: 2 })
   })
 
+  it('preserves unit definition identity from deployment through battle without mutating the catalog', () => {
+    const scenario = initialScenario
+    const definition = scenario.unitDefinitions.find(
+      ({ id }) => id === 'development.line-infantry',
+    )!
+    const originalDefinition = structuredClone(definition)
+    const deployment = gameReducer(
+      createInitialGameState(scenario),
+      { type: 'set-mode', mode: 'deployment' },
+      scenario,
+    )
+    const preview = gameReducer(
+      deployment,
+      { type: 'preview-deployment', hexId: 'hex:-3,0' },
+      scenario,
+    )
+    const placed = gameReducer(
+      preview,
+      { type: 'commit-deployment' },
+      scenario,
+    )
+    const started = gameReducer(placed, { type: 'start-battle' }, scenario)
+    const battleUnit = started.battle?.units.find(
+      ({ id }) => id === 'unit-ironwatch-01',
+    )
+
+    expect(
+      placed.units.find(({ id }) => id === 'unit-ironwatch-01')?.definitionId,
+    ).toBe(definition.id)
+    expect(battleUnit?.definition).toBe(definition)
+    expect(battleUnit).toMatchObject({
+      name: 'Ironwatch-01',
+      definitionId: definition.id,
+      q: -3,
+      r: 0,
+    })
+    expect(definition).toEqual(originalDefinition)
+  })
+
   it('selects a scenario, starts its configured battle, and returns to its deployed setup', () => {
     const selected = gameReducer(
       createInitialGameState(initialScenario),

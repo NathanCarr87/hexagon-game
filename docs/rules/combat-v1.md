@@ -96,14 +96,16 @@ has no round limit. If a round limit is configured, its policy is the highest
 objective score with a draw on ties. Its starting player is randomly selected.
 Movement terrain costs and combat AP values use the V1 defaults above.
 
-The current unit HP, Power, Guard, and Mobility values remain temporary
-scenario placeholders. The scenario marks its combat data `provisional`, and
-the UI labels it accordingly. The engine uses these values to exercise the V1
-loop, but they are not authoritative constructed-unit or prefab statistics.
-The old `actionPointsRemaining` placeholder is preserved and is not used as
-combat AP.
+The current line-infantry and scout definitions in
+`src/game/domain/unitCatalog.ts` are development fixtures. Their HP, Power,
+Guard, Mobility, and visual archetypes exist only to exercise this V1 loop;
+they are not authoritative constructed-unit definitions or prefab statistics.
+The old scenario `actionPointsRemaining` placeholder is preserved and is not
+used as combat AP. The authoritative unit catalog is empty pending game-design
+definitions.
 
 Deployment zones remain explicitly provisional and split this test map by
 axial `q`. Terrain movement, line-of-sight, elevation, and victory policy are
-configured as scenario battle rules. Pricing, templates, army construction,
-and budgets remain unspecified and are not changed by this ruleset.
+configured as scenario battle rules. Pricing formula and stat costs, prefab
+templates, construction restrictions, army construction, and budgets remain
+unspecified and are not changed by this ruleset.

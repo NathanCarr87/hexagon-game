@@ -4,6 +4,7 @@ import type {
   TerrainType,
 } from '../domain/types'
 import { hexDisk, hexId } from '../hex/coordinates'
+import { developmentUnitCatalog } from '../domain/unitCatalog'
 
 const BOARD_RADIUS = 4
 
@@ -70,7 +71,7 @@ export const initialScenario: BattlefieldScenario = {
   subtitle: 'A temporary field study across the western approach and eastern highlands.',
   recommendedForceSize: '2 scenario units per player (provisional values)',
   boardRadius: BOARD_RADIUS,
-  dataStatus: 'temporary-placeholder',
+  dataStatus: 'development-fixture',
   hexes,
   regions: [
     {
@@ -90,6 +91,7 @@ export const initialScenario: BattlefieldScenario = {
     { id: 'objective-north', name: 'North Marker', q: 0, r: -2 },
     { id: 'objective-crossing', name: 'Crossing Marker', q: 0, r: 1 },
   ],
+  unitDefinitions: developmentUnitCatalog,
   players: ['blueward', 'redoubt'],
   playerDefinitions: [
     { id: 'blueward', name: 'Blueward', color: '#76b8e8' },
@@ -135,49 +137,41 @@ export const initialScenario: BattlefieldScenario = {
     {
       id: 'unit-ironwatch-01',
       name: 'Ironwatch-01',
+      definitionId: 'development.line-infantry',
       owner: 'blueward',
-      unitType: 'line-infantry',
       q: -2,
       r: 0,
       currentHp: 8,
-      maxHp: 8,
-      stats: { Power: 3, Guard: 2, Mobility: 2 },
       actionPointsRemaining: 2,
     },
     {
       id: 'unit-ridge-02',
       name: 'Ridge-02',
+      definitionId: 'development.scout',
       owner: 'blueward',
-      unitType: 'scout',
       q: -1,
       r: 1,
       currentHp: 6,
-      maxHp: 6,
-      stats: { Power: 2, Guard: 1, Mobility: 4 },
       actionPointsRemaining: 2,
     },
     {
       id: 'unit-ashfall-01',
       name: 'Ashfall-01',
+      definitionId: 'development.line-infantry',
       owner: 'redoubt',
-      unitType: 'line-infantry',
       q: 2,
       r: -1,
       currentHp: 8,
-      maxHp: 8,
-      stats: { Power: 3, Guard: 2, Mobility: 2 },
       actionPointsRemaining: 2,
     },
     {
       id: 'unit-ashfall-02',
       name: 'Ashfall-02',
+      definitionId: 'development.scout',
       owner: 'redoubt',
-      unitType: 'scout',
       q: 1,
       r: 0,
       currentHp: 6,
-      maxHp: 6,
-      stats: { Power: 2, Guard: 1, Mobility: 4 },
       actionPointsRemaining: 2,
     },
   ],
