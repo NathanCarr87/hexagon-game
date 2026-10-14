@@ -26,8 +26,15 @@ function scenarioWith(
   objectives = initialScenario.objectives,
 ): BattlefieldScenario {
   const allHexIds = initialScenario.hexes.map(({ id }) => id)
+  const occupiedHexIds = new Set(units.map((unit) => hexId(unit)))
   return {
     ...initialScenario,
+    hexes: initialScenario.hexes.map((hex) =>
+      occupiedHexIds.has(hex.id) &&
+      initialScenario.battleRules.terrain[hex.terrain].movementCost === null
+        ? { ...hex, terrain: 'grassland' as const, elevation: 0 }
+        : hex,
+    ),
     units,
     objectives,
     setup: {
@@ -140,6 +147,75 @@ describe('battle lifecycle and turn rules', () => {
     expect(nextRound.activePlayerId).toBe('blueward')
     expect(nextRound.startingPlayerId).toBe('blueward')
     expect(nextRound.round).toBe(3)
+  })
+
+  it('completes three rounds with alternating starters, boundary turns, AP refresh, and scoring', () => {
+    const units = positionedUnits([
+      { q: 0, r: -2 },
+      { q: -3, r: 1 },
+      { q: 0, r: 1 },
+      { q: 3, r: 0 },
+    ])
+    const scenario = scenarioWith(units, {
+      victory: {
+        mode: 'objectives',
+        objectiveScoreToWin: 99,
+        roundLimit: 3,
+      },
+    })
+    let battle = start(scenario)
+    const sequence: Array<{
+      readonly round: number
+      readonly playerId: string
+      readonly startingPlayerId: string
+    }> = []
+
+    for (let turn = 0; turn < 6; turn += 1) {
+      sequence.push({
+        round: battle.round,
+        playerId: battle.activePlayerId,
+        startingPlayerId: battle.startingPlayerId,
+      })
+      const endingPlayerId = battle.activePlayerId
+      const spent = {
+        ...battle,
+        units: battle.units.map((unit) =>
+          unit.owner === endingPlayerId
+            ? { ...unit, combatApRemaining: 0 }
+            : unit,
+        ),
+      }
+      const transition = endPlayerTurn(spent, scenario)
+      expect(transition.error).toBeNull()
+      battle = transition.state
+
+      if (battle.phase === 'active') {
+        expect(
+          battle.units
+            .filter(({ owner }) => owner === battle.activePlayerId)
+            .every(
+              ({ combatApRemaining }) =>
+                combatApRemaining === scenario.battleRules.combatApPerTurn,
+            ),
+        ).toBe(true)
+      }
+    }
+
+    expect(sequence).toEqual([
+      { round: 1, playerId: 'blueward', startingPlayerId: 'blueward' },
+      { round: 1, playerId: 'redoubt', startingPlayerId: 'blueward' },
+      { round: 2, playerId: 'redoubt', startingPlayerId: 'redoubt' },
+      { round: 2, playerId: 'blueward', startingPlayerId: 'redoubt' },
+      { round: 3, playerId: 'blueward', startingPlayerId: 'blueward' },
+      { round: 3, playerId: 'redoubt', startingPlayerId: 'blueward' },
+    ])
+    expect(battle.round).toBe(3)
+    expect(battle.objectiveScores).toEqual({ blueward: 3, redoubt: 3 })
+    expect(battle.phase).toBe('ended')
+    expect(battle.result).toEqual({ winnerId: null, reason: 'draw' })
+    expect(
+      battle.log.filter(({ message }) => message.includes('scored 1 objective point')),
+    ).toHaveLength(6)
   })
 })
 
@@ -564,6 +640,108 @@ describe('battle objectives and victory', () => {
     const afterRound = endPlayerTurn(afterFirst, roundScenario).state
     expect(afterRound.phase).toBe('ended')
     expect(afterRound.result).toEqual({ winnerId: null, reason: 'draw' })
+  })
+
+  it('resolves every victory mode and simultaneous winning conditions without player-order bias', () => {
+    const scenario = scenarioWith(initialScenario.units, {
+      victory: { mode: 'objectives', objectiveScoreToWin: 2 },
+    })
+    const battle = start(scenario)
+    expect(
+      evaluateVictory(
+        { ...battle, objectiveScores: { blueward: 2, redoubt: 0 } },
+        scenario,
+      ),
+    ).toEqual({ winnerId: 'blueward', reason: 'objectives' })
+    expect(
+      evaluateVictory(
+        { ...battle, objectiveScores: { blueward: 2, redoubt: 2 } },
+        scenario,
+      ),
+    ).toEqual({ winnerId: null, reason: 'draw' })
+    expect(
+      evaluateVictory({ ...battle, units: [] }, scenario),
+    ).toEqual({ winnerId: null, reason: 'draw' })
+
+    const elimination = scenarioWith(initialScenario.units, {
+      victory: { mode: 'elimination' },
+    })
+    const eliminationBattle = start(elimination)
+    expect(
+      evaluateVictory(
+        {
+          ...eliminationBattle,
+          units: eliminationBattle.units.filter(
+            ({ owner }) => owner === 'blueward',
+          ),
+        },
+        elimination,
+      ),
+    ).toEqual({ winnerId: 'blueward', reason: 'elimination' })
+    expect(
+      evaluateVictory({ ...eliminationBattle, units: [] }, elimination),
+    ).toEqual({ winnerId: null, reason: 'draw' })
+
+    const either = scenarioWith(initialScenario.units, {
+      victory: { mode: 'either', objectiveScoreToWin: 2 },
+    })
+    const eitherBattle = start(either)
+    expect(
+      evaluateVictory(
+        {
+          ...eitherBattle,
+          units: eitherBattle.units.filter(
+            ({ owner }) => owner === 'blueward',
+          ),
+          objectiveScores: { blueward: 0, redoubt: 0 },
+        },
+        either,
+      ),
+    ).toEqual({ winnerId: 'blueward', reason: 'elimination' })
+    expect(
+      evaluateVictory(
+        {
+          ...eitherBattle,
+          units: eitherBattle.units.filter(
+            ({ owner }) => owner === 'blueward',
+          ),
+          objectiveScores: { blueward: 0, redoubt: 2 },
+        },
+        either,
+      ),
+    ).toEqual({ winnerId: null, reason: 'draw' })
+    expect(
+      evaluateVictory(
+        {
+          ...eitherBattle,
+          units: eitherBattle.units.filter(
+            ({ owner }) => owner === 'blueward',
+          ),
+          objectiveScores: { blueward: 2, redoubt: 0 },
+        },
+        either,
+      ),
+    ).toEqual({ winnerId: 'blueward', reason: 'objectives' })
+
+    const both = scenarioWith(initialScenario.units, {
+      victory: { mode: 'both', objectiveScoreToWin: 2 },
+    })
+    const bothBattle = start(both)
+    const opposingForceEliminated = {
+      ...bothBattle,
+      units: bothBattle.units.filter(({ owner }) => owner === 'blueward'),
+      objectiveScores: { blueward: 2, redoubt: 0 },
+    }
+    expect(evaluateVictory(opposingForceEliminated, both)).toEqual({
+      winnerId: 'blueward',
+      reason: 'combined',
+    })
+    expect(
+      evaluateVictory(
+        { ...opposingForceEliminated, objectiveScores: { blueward: 0, redoubt: 2 } },
+        both,
+      ),
+    ).toBeNull()
   })
 
   it('restarts from the deployed setup with the same starting player', () => {

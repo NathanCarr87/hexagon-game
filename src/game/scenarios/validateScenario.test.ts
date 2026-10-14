@@ -89,6 +89,42 @@ describe('scenario definitions', () => {
     expect(result.error).toMatch(/requires at least one objective/)
   })
 
+  it('returns actionable errors for malformed scenario containers instead of throwing', () => {
+    const missingHexes = {
+      ...initialScenario,
+      hexes: undefined,
+    } as never
+    expect(validateScenario(missingHexes)).toContain(
+      'Board hexes must be an array of objects.',
+    )
+    expect(createBattle(initialScenario.units, missingHexes).error).toMatch(
+      /Board hexes must be an array/,
+    )
+
+    const missingVictory = {
+      ...initialScenario,
+      battleRules: {
+        ...initialScenario.battleRules,
+        victory: undefined,
+      },
+    } as never
+    expect(validateScenario(missingVictory)).toContain(
+      'Battle rules must define terrain, elevation, and victory configuration objects.',
+    )
+  })
+
+  it('rejects starting units on terrain marked impassable by scenario rules', () => {
+    const invalid = {
+      ...initialScenario,
+      units: initialScenario.units.map((unit, index) =>
+        index === 0 ? { ...unit, q: -3, r: 2 } : unit,
+      ),
+    }
+    expect(validateScenario(invalid)).toContain(
+      'Ironwatch-01 is placed on terrain marked impassable by this scenario.',
+    )
+  })
+
   it('rejects unsupported board references, occupancy conflicts, and impossible zones', () => {
     const firstUnit = initialScenario.units[0]!
     const secondUnit = initialScenario.units[1]!

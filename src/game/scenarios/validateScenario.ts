@@ -1,4 +1,5 @@
 import type {
+  BattlefieldHex,
   BattlefieldScenario,
   TerrainType,
   VictoryMode,
@@ -20,12 +21,27 @@ const VICTORY_MODES: readonly VictoryMode[] = [
   'both',
 ]
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export function validateScenarioCatalog(
   scenarios: readonly BattlefieldScenario[],
 ): readonly string[] {
+  if (!Array.isArray(scenarios)) {
+    return ['Scenario catalog must be an array.']
+  }
   const errors: string[] = []
   const ids = new Set<string>()
-  for (const scenario of scenarios) {
+  for (const [index, scenario] of scenarios.entries()) {
+    if (!isRecord(scenario)) {
+      errors.push(`Scenario catalog entry ${index + 1} must be an object.`)
+      continue
+    }
+    if (typeof scenario.id !== 'string' || !scenario.id.trim()) {
+      errors.push(`Scenario catalog entry ${index + 1} needs a non-empty string ID.`)
+      continue
+    }
     if (ids.has(scenario.id)) {
       errors.push(`Scenario ID ${scenario.id} is duplicated in the catalog.`)
     }
@@ -40,17 +56,118 @@ export function validateScenario(
   const errors: string[] = []
   const add = (message: string) => errors.push(message)
 
-  if (!scenario.id.trim()) add('Scenario ID must not be empty.')
-  if (!scenario.title.trim()) add('Scenario display name must not be empty.')
-  if (!scenario.description.trim()) add('Scenario description must not be empty.')
+  if (
+    typeof scenario !== 'object' ||
+    scenario === null ||
+    Array.isArray(scenario)
+  ) {
+    return ['Scenario data must be an object.']
+  }
+  const collections: readonly [unknown, string][] = [
+    [scenario.hexes, 'Board hexes'],
+    [scenario.regions, 'Geographic regions'],
+    [scenario.objectives, 'Objectives'],
+    [scenario.units, 'Starting units'],
+    [scenario.playerDefinitions, 'Player definitions'],
+  ]
+  for (const [value, label] of collections) {
+    if (!Array.isArray(value) || value.some((entry) => !isRecord(entry))) {
+      add(`${label} must be an array of objects.`)
+    }
+  }
+  if (
+    !Array.isArray(scenario.players) ||
+    !scenario.players.every((player) => typeof player === 'string')
+  ) {
+    add('Players must be an array of string IDs.')
+  }
+  if (
+    Array.isArray(scenario.regions) &&
+    scenario.regions.some(
+      (region) =>
+        !isRecord(region) ||
+        !Array.isArray(region.hexIds) ||
+        !region.hexIds.every((id) => typeof id === 'string'),
+    )
+  ) {
+    add('Geographic regions must define arrays of string board-hex IDs.')
+  }
+  if (
+    Array.isArray(scenario.units) &&
+    scenario.units.some((unit) => !isRecord(unit) || !isRecord(unit.stats))
+  ) {
+    add('Starting units must define combat statistics objects.')
+  }
+  if (
+    !isRecord(scenario.setup) ||
+    !Array.isArray(scenario.setup.deploymentZones) ||
+    !scenario.setup.deploymentZones.every(
+      (zone) =>
+        isRecord(zone) &&
+        typeof zone.owner === 'string' &&
+        Array.isArray(zone.hexIds) &&
+        zone.hexIds.every((id) => typeof id === 'string'),
+    )
+  ) {
+    add('Setup must define deployment zones with a string owner and string hex IDs.')
+  }
+  if (
+    !isRecord(scenario.battleRules) ||
+    !isRecord(scenario.battleRules.terrain) ||
+    !isRecord(scenario.battleRules.elevationByTerrain) ||
+    !isRecord(scenario.battleRules.victory)
+  ) {
+    add('Battle rules must define terrain, elevation, and victory configuration objects.')
+  }
+  if (
+    scenario.pointBudgets !== undefined &&
+    !isRecord(scenario.pointBudgets)
+  ) {
+    add('Scenario point budgets must be an object keyed by player ID.')
+  }
+  if (errors.length > 0) return errors
+
+  if (typeof scenario.id !== 'string' || !scenario.id.trim()) {
+    add('Scenario ID must be a non-empty string.')
+  }
+  if (typeof scenario.title !== 'string' || !scenario.title.trim()) {
+    add('Scenario display name must be a non-empty string.')
+  }
+  if (
+    typeof scenario.description !== 'string' ||
+    !scenario.description.trim()
+  ) {
+    add('Scenario description must be a non-empty string.')
+  }
+  if (typeof scenario.subtitle !== 'string' || !scenario.subtitle.trim()) {
+    add('Scenario subtitle must be a non-empty string.')
+  }
+  if (
+    typeof scenario.recommendedForceSize !== 'string' ||
+    !scenario.recommendedForceSize.trim()
+  ) {
+    add('Recommended force size must be a non-empty string.')
+  }
   if (
     !Number.isInteger(scenario.boardRadius) ||
     scenario.boardRadius < 1
   ) {
     add('Board radius must be a positive integer.')
   }
+  if (scenario.dataStatus !== 'temporary-placeholder') {
+    add('Scenario data status is not supported.')
+  }
+  if (scenario.setup.rulesStatus !== 'provisional') {
+    add('Scenario setup rules status is not supported.')
+  }
+  if (
+    typeof scenario.setup.allowReposition !== 'boolean' ||
+    scenario.setup.allowMultipleUnitsPerHex !== false
+  ) {
+    add('Setup must define repositioning and disallow multiple units per hex.')
+  }
 
-  const hexById = new Map<string, (typeof scenario.hexes)[number]>()
+  const hexById = new Map<string, BattlefieldHex>()
   const seenCoordinates = new Set<string>()
   for (const hex of scenario.hexes) {
     const coordinateIsValid =
@@ -84,10 +201,14 @@ export function validateScenario(
   const regionIds = new Set<string>()
   const assignedHexIds = new Set<string>()
   for (const region of scenario.regions) {
-    if (!region.id.trim()) add('Every geographic region needs an ID.')
+    if (typeof region.id !== 'string' || !region.id.trim()) {
+      add('Every geographic region needs a non-empty string ID.')
+    }
     if (regionIds.has(region.id)) add(`Region ID ${region.id} is duplicated.`)
     regionIds.add(region.id)
-    if (!region.name.trim()) add(`Region ${region.id} needs a display name.`)
+    if (typeof region.name !== 'string' || !region.name.trim()) {
+      add(`Region ${region.id} needs a non-empty display name.`)
+    }
     for (const id of region.hexIds) {
       if (!hexById.has(id)) {
         add(`Region ${region.name} references unknown board hex ${id}.`)
@@ -166,7 +287,9 @@ export function validateScenario(
 
   const objectiveIds = new Set<string>()
   for (const objective of scenario.objectives) {
-    if (!objective.id.trim()) add('Every objective needs an ID.')
+    if (typeof objective.id !== 'string' || !objective.id.trim()) {
+      add('Every objective needs a non-empty string ID.')
+    }
     if (objectiveIds.has(objective.id)) {
       add(`Objective ID ${objective.id} is duplicated.`)
     }
@@ -264,7 +387,9 @@ export function validateScenario(
   const occupied = new Set<string>()
   const unitsPerPlayer = new Map<string, number>()
   for (const unit of scenario.units) {
-    if (!unit.id.trim()) add('Every starting unit needs an ID.')
+    if (typeof unit.id !== 'string' || !unit.id.trim()) {
+      add('Every starting unit needs a non-empty string ID.')
+    }
     if (unitIds.has(unit.id)) add(`Starting unit ID ${unit.id} is duplicated.`)
     unitIds.add(unit.id)
     if (!playerIds.has(unit.owner)) {
@@ -280,6 +405,13 @@ export function validateScenario(
     unitsPerPlayer.set(unit.owner, (unitsPerPlayer.get(unit.owner) ?? 0) + 1)
     if (!zoneByOwner.get(unit.owner)?.hexIds.includes(id)) {
       add(`${unit.name} is outside its owner's deployment zone.`)
+    }
+    const unitHex = hexById.get(id)
+    if (
+      unitHex &&
+      scenario.battleRules.terrain[unitHex.terrain]?.movementCost === null
+    ) {
+      add(`${unit.name} is placed on terrain marked impassable by this scenario.`)
     }
     if (
       !Number.isFinite(unit.currentHp) ||

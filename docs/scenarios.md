@@ -25,6 +25,11 @@ units as scenario presets and does not pretend to calculate force costs or
 allow unpriced force editing. A scenario with configured budgets is rejected
 until a pricing service is available to enforce them.
 
+Deployment remains limited to the selected unit's configured player zone,
+unoccupied hexes, and terrain the scenario marks as passable. An invalid
+placement is not committed. Scenario definitions are also rejected if a
+starting unit is placed on terrain marked impassable.
+
 The existing provisional deployment rules and V1 combat rules are documented
 in [combat-v1.md](./rules/combat-v1.md); this scenario catalog does not redefine
 them.

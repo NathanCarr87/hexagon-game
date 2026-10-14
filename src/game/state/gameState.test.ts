@@ -96,6 +96,31 @@ describe('scenario setup state', () => {
     ).toEqual(initial.units)
   })
 
+  it('does not commit a deployment onto impassable terrain', () => {
+    const initial = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'set-mode', mode: 'deployment' },
+      initialScenario,
+    )
+    const preview = gameReducer(
+      initial,
+      { type: 'preview-deployment', hexId: 'hex:-3,2' },
+      initialScenario,
+    )
+
+    expect(preview.deploymentError).toMatch(/terrain is impassable/)
+    const rejected = gameReducer(
+      preview,
+      { type: 'commit-deployment' },
+      initialScenario,
+    )
+    expect(rejected.units).toEqual(initial.units)
+    expect(rejected.units.find(({ id }) => id === 'unit-ironwatch-01')).toMatchObject({
+      q: -2,
+      r: 0,
+    })
+  })
+
   it('ignores unknown identities and restores initial setup on reset', () => {
     const initial = createInitialGameState(initialScenario)
     const selected = gameReducer(

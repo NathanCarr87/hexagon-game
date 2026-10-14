@@ -108,8 +108,8 @@ export function ForceSetupPanel({
         </div>
         <p className="deployment-rules">
           Provisional zones split the map by q coordinate. Stacking is
-          disallowed; terrain restrictions and ownership rules are otherwise
-          not defined.
+          disallowed, and terrain marked impassable by this scenario cannot be
+          used for deployment.
         </p>
         {state.mode === 'deployment' && (
           <div className="placement-status" aria-live="polite">

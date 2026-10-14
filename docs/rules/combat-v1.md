@@ -16,7 +16,11 @@ of React and Three.js in `src/game/state/battle.ts`.
 - Turns alternate as whole-player turns within each round. Units of the active
   player can act in any order. The starting player alternates each round: the
   second player in one round starts the next, so that player begins consecutive
-  turns across the round boundary.
+  turns across the round boundary. This is intentional in the current
+  initiative policy; it is not a strict alternating-player sequence. For a
+  Blueward start, the first three rounds are `Blueward R1`, `Redoubt R1`,
+  `Redoubt R2`, `Blueward R2`, `Blueward R3`, `Redoubt R3`. Round numbering
+  changes when the second player of the current round ends their turn.
 - Units of the starting player receive 2 **combat AP** when battle begins.
   Other units start with no combat AP until their first turn. Each unit then
   receives 2 combat AP at the beginning of its owner's turn.
@@ -67,10 +71,23 @@ of React and Three.js in `src/game/state/battle.ts`.
   control. Scores persist.
 - Victory mode is configured as `objectives`, `elimination`, `either`, or
   `both`. Objective victory requires the scenario's configured score threshold.
+- If both players meet the objective threshold at the same victory check,
+  objective-only victory is a draw rather than favoring player order. In
+  `either` mode, if objective and elimination conditions simultaneously favor
+  different players, the result is a draw; if both favor the same player, that
+  player wins. An objective win is reported when that player meets both
+  conditions in `either` mode. In `both` mode, one player must both eliminate
+  the opposing force and meet the objective threshold. Simultaneous elimination
+  of both forces is a draw when no other victory condition already awards a
+  player; this prevents objective-only battles from continuing without any
+  units able to score.
 - Victory is checked after attacks, after objective scoring, and at turn
   transitions. Further battle actions are rejected after battle end.
-- A scenario may set a round limit. When exceeded, the player with the higher
-  objective score wins; tied scores (or no objective scoring) result in a draw.
+- A scenario may set a round limit. The configured number of complete rounds is
+  played; after the final turn's objective scoring and normal victory check,
+  the player with the higher objective score wins. Tied scores (or no objective
+  scoring) result in a draw. A normal objective victory on that final turn
+  takes precedence over the round-limit result.
 
 ## Current scenario policy and provisional data
 

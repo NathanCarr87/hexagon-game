@@ -73,6 +73,8 @@ export function validateBattleSetup(
   units: readonly ScenarioUnit[],
   scenario: BattlefieldScenario,
 ): string | null {
+  const scenarioError = validateScenario(scenario)[0]
+  if (scenarioError) return scenarioError
   if (scenario.players.length !== 2) {
     return 'Version 1 battles require exactly two configured players.'
   }
@@ -463,11 +465,15 @@ export function evaluateVictory(
 ): BattleResult | null {
   const mode = scenario.battleRules.victory.mode
   const eliminatedWinner = eliminationWinner(battle.units, scenario.players)
-  const objectives = scenario.players.map((playerId) => ({
-    playerId,
-    met: objectiveConditionMet(playerId, battle.objectiveScores, scenario),
-  }))
-  const objectiveWinner = objectives.find(({ met }) => met)?.playerId
+  const objectiveWinners = scenario.players.filter((playerId) =>
+    objectiveConditionMet(playerId, battle.objectiveScores, scenario),
+  )
+  const objectiveResult: BattleResult | null =
+    objectiveWinners.length > 1
+      ? { winnerId: null, reason: 'draw' }
+      : objectiveWinners.length === 1
+        ? { winnerId: objectiveWinners[0] ?? null, reason: 'objectives' }
+        : null
 
   if (mode === 'elimination' && eliminatedWinner !== undefined) {
     return {
@@ -475,24 +481,30 @@ export function evaluateVictory(
       reason: eliminatedWinner ? 'elimination' : 'draw',
     }
   }
-  if (mode === 'objectives' && objectiveWinner) {
-    return { winnerId: objectiveWinner, reason: 'objectives' }
+  if (mode === 'objectives') {
+    return objectiveResult ??
+      (eliminatedWinner === null ? { winnerId: null, reason: 'draw' } : null)
   }
   if (mode === 'either') {
-    if (objectiveWinner) return { winnerId: objectiveWinner, reason: 'objectives' }
-    if (eliminatedWinner) {
-      return { winnerId: eliminatedWinner, reason: 'elimination' }
+    const possibleWinners = [
+      ...objectiveWinners,
+      ...(eliminatedWinner ? [eliminatedWinner] : []),
+    ]
+    const distinctWinners = new Set(possibleWinners)
+    if (distinctWinners.size > 1) return { winnerId: null, reason: 'draw' }
+    if (possibleWinners[0]) {
+      return objectiveWinners.length > 0
+        ? { winnerId: possibleWinners[0], reason: 'objectives' }
+        : { winnerId: possibleWinners[0], reason: 'elimination' }
     }
-    if (eliminatedWinner === null) return { winnerId: null, reason: 'draw' }
+    if (objectiveResult?.winnerId === null || eliminatedWinner === null) {
+      return { winnerId: null, reason: 'draw' }
+    }
   }
   if (mode === 'both') {
     if (
       eliminatedWinner &&
-      objectiveConditionMet(
-        eliminatedWinner,
-        battle.objectiveScores,
-        scenario,
-      )
+      objectiveWinners.includes(eliminatedWinner)
     ) {
       return { winnerId: eliminatedWinner, reason: 'combined' }
     }

@@ -13,6 +13,15 @@ export function validateDeployment(
   const destination = scenario.hexes.find(({ id }) => id === destinationHexId)
   if (!destination) return 'That hex is not part of this battlefield.'
 
+  const movementCost =
+    scenario.battleRules?.terrain?.[destination.terrain]?.movementCost
+  if (movementCost === null) {
+    return 'That terrain is impassable under this scenario\'s rules.'
+  }
+  if (movementCost === undefined) {
+    return 'This scenario does not define whether that terrain is passable.'
+  }
+
   const zone = scenario.setup.deploymentZones.find(
     ({ owner }) => owner === unit.owner,
   )
