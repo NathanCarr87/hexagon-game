@@ -10,12 +10,12 @@ const northHexIds = initialScenario.hexes
 const southHexIds = initialScenario.hexes
   .filter(({ r }) => r >= 0)
   .map(({ id }) => id)
-const westHexIds = initialScenario.hexes
-  .filter(({ q }) => q < 0)
-  .map(({ id }) => id)
-const eastHexIds = initialScenario.hexes
-  .filter(({ q }) => q >= 0)
-  .map(({ id }) => id)
+const westHexIds =
+  initialScenario.setup.deploymentZones.find(({ owner }) => owner === 'blueward')
+    ?.hexIds ?? []
+const eastHexIds =
+  initialScenario.setup.deploymentZones.find(({ owner }) => owner === 'redoubt')
+    ?.hexIds ?? []
 
 const regions: readonly ScenarioRegion[] = [
   {

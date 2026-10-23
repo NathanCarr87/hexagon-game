@@ -28,16 +28,26 @@ function scenarioWith(
   unitDefinitions: readonly UnitDefinition[] =
     initialScenario.unitDefinitions,
 ): BattlefieldScenario {
-  const allHexIds = initialScenario.hexes.map(({ id }) => id)
   const occupiedHexIds = new Set(units.map((unit) => hexId(unit)))
+  const terrainRules = {
+    ...initialScenario.battleRules.terrain,
+    ...terrain,
+  }
+  const hexes = initialScenario.hexes.map((hex) =>
+    occupiedHexIds.has(hex.id) &&
+    initialScenario.battleRules.terrain[hex.terrain].movementCost === null
+      ? { ...hex, terrain: 'grassland' as const, elevation: 0 }
+      : hex,
+  )
+  const deployableHexIds = hexes
+    .filter(
+      ({ terrain: hexTerrain }) =>
+        terrainRules[hexTerrain].movementCost !== null,
+    )
+    .map(({ id }) => id)
   return {
     ...initialScenario,
-    hexes: initialScenario.hexes.map((hex) =>
-      occupiedHexIds.has(hex.id) &&
-      initialScenario.battleRules.terrain[hex.terrain].movementCost === null
-        ? { ...hex, terrain: 'grassland' as const, elevation: 0 }
-        : hex,
-    ),
+    hexes,
     units,
     objectives,
     unitDefinitions,
@@ -45,7 +55,7 @@ function scenarioWith(
       ...initialScenario.setup,
       deploymentZones: initialScenario.players.map((owner) => ({
         owner,
-        hexIds: allHexIds,
+        hexIds: deployableHexIds,
       })),
     },
     startingPlayerPolicy: rules.startingPlayerId
@@ -54,7 +64,7 @@ function scenarioWith(
     battleRules: {
       ...initialScenario.battleRules,
       ...rules,
-      terrain: { ...initialScenario.battleRules.terrain, ...terrain },
+      terrain: terrainRules,
     },
   }
 }

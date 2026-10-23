@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BattlefieldScenario } from '../domain/types'
 import { openGroundScenario } from './openGround'
 import { initialScenario } from './initialScenario'
+import { riverFordScenario } from './riverFord'
 import { scenarios } from './index'
 import {
   createBattle,
@@ -13,20 +14,24 @@ import {
 } from './validateScenario'
 
 describe('scenario definitions', () => {
-  it('loads the terrain-focused and open-ground scenarios as valid definitions', () => {
+  it('loads all three scenarios as valid definitions with stable IDs', () => {
     expect(scenarios.map(({ id }) => id)).toEqual([
       'the-narrows',
       'open-ground',
+      'river-ford',
     ])
     expect(validateScenarioCatalog(scenarios)).toEqual([])
-    expect(validateScenario(initialScenario)).toEqual([])
-    expect(validateScenario(openGroundScenario)).toEqual([])
+    expect(scenarios.flatMap(validateScenario)).toEqual([])
     expect(initialScenario.battleRules.victory.mode).toBe('either')
     expect(
       new Set(openGroundScenario.hexes.map(({ terrain }) => terrain)),
     ).toEqual(new Set(['grassland']))
     expect(openGroundScenario.battleRules.victory.mode).toBe('elimination')
     expect(openGroundScenario.battleRules.startingPlayerId).toBe('blueward')
+    expect(riverFordScenario.objectives).toHaveLength(3)
+    expect(new Set(riverFordScenario.hexes.map(({ terrain }) => terrain))).toEqual(
+      new Set(['grassland', 'hills', 'forest', 'mountains', 'water']),
+    )
   })
 
   it('applies the open-ground elimination policy to its playable starting force', () => {
@@ -199,8 +204,81 @@ describe('scenario definitions', () => {
       expect.arrayContaining([
         expect.stringMatching(/More than one starting unit occupies/),
         expect.stringMatching(/unknown geographic region/),
-        expect.stringMatching(/fewer hexes than its starting units/),
+        expect.stringMatching(/fewer deployable hexes than its starting units/),
       ]),
+    )
+  })
+
+  it('requires deployment zones and objectives to use deployable terrain', () => {
+    const invalid = {
+      ...initialScenario,
+      objectives: [
+        ...initialScenario.objectives,
+        { id: 'water-objective', name: 'Water Objective', q: -3, r: 2 },
+      ],
+      setup: {
+        ...initialScenario.setup,
+        deploymentZones: initialScenario.setup.deploymentZones.map((zone) =>
+          zone.owner === 'blueward'
+            ? { ...zone, hexIds: [...zone.hexIds, 'hex:-3,2'] }
+            : zone,
+        ),
+      },
+    }
+
+    expect(validateScenario(invalid)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/deployment zone includes impassable hex/),
+        expect.stringMatching(/Objective .* located on impassable terrain/),
+      ]),
+    )
+  })
+
+  it('rejects incomplete board layouts and duplicate objective locations', () => {
+    const invalid = {
+      ...initialScenario,
+      hexes: initialScenario.hexes.filter(({ id }) => id !== 'hex:4,0'),
+      objectives: [
+        ...initialScenario.objectives,
+        { id: 'duplicate-location', name: 'Duplicate', q: 0, r: -2 },
+      ],
+    }
+
+    expect(validateScenario(invalid)).toEqual(
+      expect.arrayContaining([
+        'Board layout is missing configured hex hex:4,0.',
+        'More than one objective occupies board hex hex:0,-2.',
+      ]),
+    )
+  })
+
+  it('rejects an objective unreachable through passable terrain', () => {
+    const blocked = {
+      ...initialScenario,
+      hexes: initialScenario.hexes.map((hex) =>
+        hex.q === 0
+          ? { ...hex, terrain: 'water' as const, elevation: 0 }
+          : hex,
+      ),
+      objectives: [
+        { id: 'western-one', name: 'Western One', q: -2, r: 0 },
+        { id: 'western-two', name: 'Western Two', q: -1, r: 0 },
+      ],
+      setup: {
+        ...initialScenario.setup,
+        deploymentZones: initialScenario.setup.deploymentZones.map((zone) =>
+          zone.owner === 'redoubt'
+            ? {
+                ...zone,
+                hexIds: zone.hexIds.filter((id) => !id.startsWith('hex:0,')),
+              }
+            : zone,
+        ),
+      },
+    }
+
+    expect(validateScenario(blocked)).toContain(
+      "redoubt cannot reach objective at hex:-2,0 under this scenario's movement rules.",
     )
   })
 

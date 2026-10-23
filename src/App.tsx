@@ -33,6 +33,11 @@ function App() {
         ({ owner }) => owner === selectedUnit.owner,
       )?.hexIds ?? []
     : []
+  const deploymentZoneOwnerByHex = Object.fromEntries(
+    scenario.setup.deploymentZones.flatMap((zone) =>
+      zone.hexIds.map((hexId) => [hexId, zone.owner]),
+    ),
+  )
   const occupiedHexIds = activeUnits
     .filter((unit) => unit.id !== gameState.selectedUnitId)
     .map((unit) => `hex:${unit.q},${unit.r}`)
@@ -122,6 +127,7 @@ function App() {
               movementHexIds={movementHexIds}
               attackHexIds={attackHexIds}
               eligibleHexIds={eligibleHexIds}
+              deploymentZoneOwnerByHex={deploymentZoneOwnerByHex}
               occupiedHexIds={occupiedHexIds}
               deploymentTargetHexId={gameState.deploymentTargetHexId}
               onSelectHex={(hexId) => {

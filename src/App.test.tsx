@@ -103,4 +103,17 @@ describe('App', () => {
     )
     expect(screen.getByRole('button', { name: 'Start battle' })).toBeEnabled()
   })
+
+  it('selects the river-crossing scenario from the scenario picker', () => {
+    render(<App />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Choose scenario' }), {
+      target: { value: 'river-ford' },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'The River Ford' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/central ford/i)).toBeInTheDocument()
+    expect(screen.getByText('water')).toBeInTheDocument()
+  })
 })

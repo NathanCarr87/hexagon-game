@@ -4,7 +4,12 @@ import type {
   TerrainType,
   VictoryMode,
 } from '../domain/types'
-import { hexDistance, hexId } from '../hex/coordinates'
+import {
+  hexDisk,
+  hexDistance,
+  hexId,
+  hexNeighbors,
+} from '../hex/coordinates'
 import {
   getUnitDefinition,
   validateUnitCatalog,
@@ -208,6 +213,15 @@ export function validateScenario(
     }
   }
   if (scenario.hexes.length === 0) add('Scenario board must contain at least one hex.')
+  if (Number.isInteger(scenario.boardRadius) && scenario.boardRadius > 0) {
+    const configuredHexIds = new Set(scenario.hexes.map(({ id }) => id))
+    for (const coordinate of hexDisk(scenario.boardRadius)) {
+      const id = hexId(coordinate)
+      if (!configuredHexIds.has(id)) {
+        add(`Board layout is missing configured hex ${id}.`)
+      }
+    }
+  }
 
   const regionIds = new Set<string>()
   const assignedHexIds = new Set<string>()
@@ -224,6 +238,9 @@ export function validateScenario(
       if (!hexById.has(id)) {
         add(`Region ${region.name} references unknown board hex ${id}.`)
         continue
+      }
+      if (hexById.get(id)?.regionId !== region.id) {
+        add(`Board hex ${id} does not reference region ${region.id} that contains it.`)
       }
       if (assignedHexIds.has(id)) {
         add(`Board hex ${id} belongs to more than one geographic region.`)
@@ -284,9 +301,17 @@ export function validateScenario(
     if (zone.hexIds.length === 0) {
       add(`${zone.owner} deployment zone must contain at least one valid hex.`)
     }
+    if (new Set(zone.hexIds).size !== zone.hexIds.length) {
+      add(`${zone.owner} deployment zone contains duplicate hex IDs.`)
+    }
     for (const id of zone.hexIds) {
-      if (!hexById.has(id)) {
+      const hex = hexById.get(id)
+      if (!hex) {
         add(`${zone.owner} deployment zone references unknown hex ${id}.`)
+      } else if (
+        scenario.battleRules.terrain[hex.terrain]?.movementCost === null
+      ) {
+        add(`${zone.owner} deployment zone includes impassable hex ${id}.`)
       }
     }
   }
@@ -297,9 +322,13 @@ export function validateScenario(
   }
 
   const objectiveIds = new Set<string>()
+  const objectiveHexIds = new Set<string>()
   for (const objective of scenario.objectives) {
     if (typeof objective.id !== 'string' || !objective.id.trim()) {
       add('Every objective needs a non-empty string ID.')
+    }
+    if (typeof objective.name !== 'string' || !objective.name.trim()) {
+      add(`Objective ${objective.id} needs a non-empty display name.`)
     }
     if (objectiveIds.has(objective.id)) {
       add(`Objective ID ${objective.id} is duplicated.`)
@@ -307,8 +336,20 @@ export function validateScenario(
     objectiveIds.add(objective.id)
     if (!Number.isInteger(objective.q) || !Number.isInteger(objective.r)) {
       add(`Objective ${objective.name} must use integer axial coordinates.`)
-    } else if (!hexById.has(hexId(objective))) {
-      add(`Objective ${objective.name} is not located on a valid board hex.`)
+    } else {
+      const id = hexId(objective)
+      const hex = hexById.get(id)
+      if (!hex) {
+        add(`Objective ${objective.name} is not located on a valid board hex.`)
+      } else {
+        if (objectiveHexIds.has(id)) {
+          add(`More than one objective occupies board hex ${id}.`)
+        }
+        objectiveHexIds.add(id)
+        if (scenario.battleRules.terrain[hex.terrain]?.movementCost === null) {
+          add(`Objective ${objective.name} is located on impassable terrain.`)
+        }
+      }
     }
   }
 
@@ -455,12 +496,62 @@ export function validateScenario(
     const unitCount = unitsPerPlayer.get(playerId) ?? 0
     if (unitCount < 1) add(`${playerId} needs at least one starting unit.`)
     const zone = zoneByOwner.get(playerId)
+    const usableHexCount =
+      zone?.hexIds.filter((id) => {
+        const hex = hexById.get(id)
+        return (
+          hex !== undefined &&
+          battleRules.terrain[hex.terrain]?.movementCost !== null
+        )
+      }).length ?? 0
     if (
       !scenario.setup.allowMultipleUnitsPerHex &&
       zone &&
-      zone.hexIds.length < unitCount
+      usableHexCount < unitCount
     ) {
-      add(`${playerId} deployment zone has fewer hexes than its starting units.`)
+      add(`${playerId} deployment zone has fewer deployable hexes than its starting units.`)
+    }
+  }
+
+  if (
+    ['objectives', 'either', 'both'].includes(battleRules.victory.mode) &&
+    objectiveHexIds.size > 0
+  ) {
+    for (const playerId of scenario.players) {
+      const zone = zoneByOwner.get(playerId)
+      const reachable = new Set<string>()
+      const pending = (zone?.hexIds ?? []).filter((id) => {
+        const hex = hexById.get(id)
+        return (
+          hex !== undefined &&
+          battleRules.terrain[hex.terrain]?.movementCost !== null
+        )
+      })
+      pending.forEach((id) => reachable.add(id))
+      while (pending.length > 0) {
+        const currentId = pending.shift()
+        const current = currentId ? hexById.get(currentId) : undefined
+        if (!current) continue
+        for (const neighbor of hexNeighbors(current)) {
+          const neighborId = hexId(neighbor)
+          const hex = hexById.get(neighborId)
+          if (
+            hex &&
+            battleRules.terrain[hex.terrain]?.movementCost !== null &&
+            !reachable.has(neighborId)
+          ) {
+            reachable.add(neighborId)
+            pending.push(neighborId)
+          }
+        }
+      }
+      for (const objectiveId of objectiveHexIds) {
+        if (!reachable.has(objectiveId)) {
+          add(
+            `${playerId} cannot reach objective at ${objectiveId} under this scenario's movement rules.`,
+          )
+        }
+      }
     }
   }
 

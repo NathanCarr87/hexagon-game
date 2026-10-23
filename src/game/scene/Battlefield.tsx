@@ -23,6 +23,7 @@ interface BattlefieldProps {
   readonly movementHexIds: readonly string[]
   readonly attackHexIds: readonly string[]
   readonly eligibleHexIds: readonly string[]
+  readonly deploymentZoneOwnerByHex: Readonly<Record<string, string>>
   readonly occupiedHexIds: readonly string[]
   readonly deploymentTargetHexId: string | null
   readonly onSelectHex: (hexId: string) => void
@@ -40,6 +41,7 @@ function HexTile({
   hex,
   selected,
   deploymentStatus,
+  deploymentZoneColor,
   isTarget,
   onSelect,
 }: {
@@ -52,6 +54,7 @@ function HexTile({
     | 'move'
     | 'attack'
     | null
+  readonly deploymentZoneColor: string | null
   readonly isTarget: boolean
   readonly onSelect: () => void
 }) {
@@ -99,24 +102,26 @@ function HexTile({
           <meshBasicMaterial
             color={
               deploymentStatus === 'eligible'
-                ? '#b8e37f'
+                ? deploymentZoneColor ?? '#b8e37f'
                 : deploymentStatus === 'occupied'
                   ? '#ee7864'
                   : deploymentStatus === 'move'
                     ? '#64d9c4'
                     : deploymentStatus === 'attack'
                       ? '#f08c73'
-                      : '#b65b4f'
+                      : deploymentZoneColor ?? '#b65b4f'
             }
             depthWrite={false}
             opacity={
               deploymentStatus === 'eligible'
-                ? 0.32
+                ? 0.4
                 : deploymentStatus === 'occupied'
                   ? 0.48
                   : deploymentStatus === 'move' || deploymentStatus === 'attack'
                     ? 0.45
-                    : 0.2
+                    : deploymentZoneColor
+                      ? 0.32
+                      : 0.2
             }
             side={2}
             transparent
@@ -193,11 +198,13 @@ function ObjectiveMarker({
   name,
   position,
   height,
+  ownerColor,
   onSelect,
 }: {
   readonly name: string
   readonly position: readonly [number, number, number]
   readonly height: number
+  readonly ownerColor: string | null
   readonly onSelect: () => void
 }) {
   return (
@@ -210,15 +217,15 @@ function ObjectiveMarker({
     >
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.27, 0.32, 24]} />
-        <meshBasicMaterial color="#ead28a" side={2} />
+        <meshBasicMaterial color={ownerColor ?? '#ead28a'} side={2} />
       </mesh>
       <mesh position={[0, 0.16, 0]}>
         <cylinderGeometry args={[0.025, 0.025, 0.3, 6]} />
-        <meshStandardMaterial color="#ead28a" />
+        <meshStandardMaterial color={ownerColor ?? '#ead28a'} />
       </mesh>
       <mesh position={[0.09, 0.25, 0]}>
         <coneGeometry args={[0.1, 0.12, 4]} />
-        <meshStandardMaterial color="#ead28a" />
+        <meshStandardMaterial color={ownerColor ?? '#ead28a'} />
       </mesh>
       <group name={name} />
     </group>
@@ -353,6 +360,7 @@ function BattlefieldScene({
   movementHexIds,
   attackHexIds,
   eligibleHexIds,
+  deploymentZoneOwnerByHex,
   occupiedHexIds,
   deploymentTargetHexId,
   onSelectHex,
@@ -406,6 +414,13 @@ function BattlefieldScene({
                   ? 'attack'
                   : null
           }
+          deploymentZoneColor={
+            deploymentMode
+              ? scenario.playerDefinitions.find(
+                  ({ id }) => id === deploymentZoneOwnerByHex[hex.id],
+                )?.color ?? null
+              : null
+          }
           isTarget={deploymentTargetHexId === hex.id}
           onSelect={() => onSelectHex(hex.id)}
         />
@@ -420,6 +435,15 @@ function BattlefieldScene({
             name={objective.name}
             position={[position.x, 0, position.z]}
             height={elevationAt(hex)}
+            ownerColor={
+              scenario.playerDefinitions.find(
+                ({ id }) =>
+                  id ===
+                  units.find(
+                    (unit) => unit.q === objective.q && unit.r === objective.r,
+                  )?.owner,
+              )?.color ?? null
+            }
             onSelect={() => onSelectHex(hex.id)}
           />
         )

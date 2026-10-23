@@ -45,6 +45,18 @@ const westHexIds = coordinates
 const eastHexIds = coordinates
   .filter(({ q }) => q >= 0)
   .map((coordinate) => hexId(coordinate))
+const westDeploymentHexIds = coordinates
+  .filter(({ q, r }) => {
+    const terrain = terrainByCoordinate[`${q},${r}`] ?? 'grassland'
+    return q < 0 && terrain !== 'water' && terrain !== 'mountains'
+  })
+  .map((coordinate) => hexId(coordinate))
+const eastDeploymentHexIds = coordinates
+  .filter(({ q, r }) => {
+    const terrain = terrainByCoordinate[`${q},${r}`] ?? 'grassland'
+    return q >= 0 && terrain !== 'water' && terrain !== 'mountains'
+  })
+  .map((coordinate) => hexId(coordinate))
 
 const regionByHexId = new Map<string, string>([
   ...westHexIds.map((id) => [id, 'western-approach'] as const),
@@ -102,8 +114,8 @@ export const initialScenario: BattlefieldScenario = {
     allowReposition: true,
     allowMultipleUnitsPerHex: false,
     deploymentZones: [
-      { owner: 'blueward', hexIds: westHexIds },
-      { owner: 'redoubt', hexIds: eastHexIds },
+      { owner: 'blueward', hexIds: westDeploymentHexIds },
+      { owner: 'redoubt', hexIds: eastDeploymentHexIds },
     ],
   },
   startingPlayerPolicy: 'random',

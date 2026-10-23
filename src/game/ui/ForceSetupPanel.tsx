@@ -119,7 +119,7 @@ export function ForceSetupPanel({
           </button>
         </div>
         <p className="deployment-rules">
-          Provisional zones split the map by q coordinate. Stacking is
+          Player-colored hexes show each side’s deployable area. Stacking is
           disallowed, and terrain marked impassable by this scenario cannot be
           used for deployment.
         </p>
