@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Edges, OrbitControls } from '@react-three/drei'
+import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { Vector3 } from 'three'
+import type { Camera, Object3D } from 'three'
 import type {
   BattlefieldHex,
   BattlefieldScenario,
   ScenarioUnit,
   UnitDefinition,
 } from '../domain/types'
-import { axialToWorld } from '../hex/coordinates'
+import { axialToWorld, HEX_SIZE } from '../hex/coordinates'
 import { TERRAIN_APPEARANCE } from './terrainAppearance'
 import { getUnitDefinition } from '../domain/unitCatalog'
 
@@ -20,6 +22,11 @@ interface BattlefieldProps {
   readonly deploymentMode: boolean
   readonly battleMode: boolean
   readonly battleActionMode: 'select' | 'move' | 'attack'
+  readonly battlePhase: 'active' | 'ended' | null
+  readonly activePlayerId: string | null
+  readonly combatApRemaining: number | undefined
+  readonly moveDisabledReason: string | null
+  readonly attackDisabledReason: string | null
   readonly movementHexIds: readonly string[]
   readonly movementRouteHexIds: readonly string[]
   readonly attackHexIds: readonly string[]
@@ -30,10 +37,38 @@ interface BattlefieldProps {
   readonly onSelectHex: (hexId: string) => void
   readonly onSelectUnit: (unitId: string) => void
   readonly onHoverHex: (hexId: string | null) => void
+  readonly onSetBattleAction: (
+    mode: 'select' | 'move' | 'attack',
+  ) => void
 }
 
-const HEX_RADIUS = 1
 const HEX_BASE = -0.2
+const ACTION_MENU_WIDTH = 218
+const ACTION_MENU_HEIGHT = 154
+const ACTION_MENU_MARGIN = 8
+
+function calculateActionMenuPosition(
+  object: Object3D,
+  camera: Camera,
+  size: { readonly width: number; readonly height: number },
+): number[] {
+  const projected = object.getWorldPosition(new Vector3()).project(camera)
+  if (projected.z > 1) {
+    return [-ACTION_MENU_WIDTH, -ACTION_MENU_HEIGHT]
+  }
+  const x = ((projected.x + 1) * size.width) / 2
+  const y = ((1 - projected.y) * size.height) / 2
+  return [
+    Math.min(
+      Math.max(x, ACTION_MENU_MARGIN),
+      Math.max(ACTION_MENU_MARGIN, size.width - ACTION_MENU_WIDTH - ACTION_MENU_MARGIN),
+    ),
+    Math.min(
+      Math.max(y, ACTION_MENU_MARGIN),
+      Math.max(ACTION_MENU_MARGIN, size.height - ACTION_MENU_HEIGHT - ACTION_MENU_MARGIN),
+    ),
+  ]
+}
 
 function elevationAt(hex: BattlefieldHex): number {
   return TERRAIN_APPEARANCE[hex.terrain].surfaceHeight
@@ -86,11 +121,10 @@ function HexTile({
     >
       <mesh
         position={[0, HEX_BASE + height / 2, 0]}
-        rotation={[0, -Math.PI / 2, 0]}
         receiveShadow
         castShadow
       >
-        <cylinderGeometry args={[HEX_RADIUS, HEX_RADIUS, height, 6]} />
+        <cylinderGeometry args={[HEX_SIZE, HEX_SIZE, height, 6]} />
         <meshStandardMaterial
           color={selected ? '#c8df8a' : appearance.color}
           emissive={selected ? '#5a7232' : '#000000'}
@@ -141,7 +175,7 @@ function HexTile({
           position={[0, top + 0.035, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
-          <ringGeometry args={[0.45, 0.53, 6]} />
+          <ringGeometry args={[0.45, 0.53, 6, 1, Math.PI / 2]} />
           <meshBasicMaterial color="#d5ef91" side={2} />
         </mesh>
       )}
@@ -150,7 +184,7 @@ function HexTile({
           position={[0, top + 0.04, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
-          <ringGeometry args={[0.7, 0.78, 6]} />
+          <ringGeometry args={[0.7, 0.78, 6, 1, Math.PI / 2]} />
           <meshBasicMaterial color="#f2d78e" side={2} />
         </mesh>
       )}
@@ -216,12 +250,14 @@ function ObjectiveMarker({
   position,
   height,
   ownerColor,
+  selected,
   onSelect,
 }: {
   readonly name: string
   readonly position: readonly [number, number, number]
   readonly height: number
   readonly ownerColor: string | null
+  readonly selected: boolean
   readonly onSelect: () => void
 }) {
   return (
@@ -232,19 +268,43 @@ function ObjectiveMarker({
         onSelect()
       }}
     >
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.27, 0.32, 24]} />
-        <meshBasicMaterial color={ownerColor ?? '#ead28a'} side={2} />
+      <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.57, 0.57, 0.09, 12]} />
+        <meshStandardMaterial color="#252c27" roughness={0.82} />
       </mesh>
-      <mesh position={[0, 0.16, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.3, 6]} />
-        <meshStandardMaterial color={ownerColor ?? '#ead28a'} />
+      <mesh position={[0, 0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.4, 0.51, 12]} />
+        <meshBasicMaterial color={ownerColor ?? '#f0c85c'} side={2} />
       </mesh>
-      <mesh position={[0.09, 0.25, 0]}>
-        <coneGeometry args={[0.1, 0.12, 4]} />
-        <meshStandardMaterial color={ownerColor ?? '#ead28a'} />
+      <mesh position={[0, 0.14, 0]} rotation={[Math.PI / 4, 0, 0]}>
+        <octahedronGeometry args={[0.15, 0]} />
+        <meshStandardMaterial
+          color="#f3d477"
+          emissive="#805d18"
+          emissiveIntensity={0.22}
+          roughness={0.48}
+        />
       </mesh>
-      <group name={name} />
+      {selected && (
+        <mesh position={[0, 0.105, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.57, 0.62, 12]} />
+          <meshBasicMaterial color="#f4f0dc" side={2} />
+        </mesh>
+      )}
+      {selected && (
+        <Html
+          center
+          distanceFactor={10}
+          position={[0, 0.82, 0]}
+          style={{ pointerEvents: 'none' }}
+          zIndexRange={[5, 0]}
+        >
+          <div className="objective-map-label">
+            <strong>{name}</strong>
+            <span>OBJECTIVE</span>
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -331,6 +391,123 @@ function UnitFigure({
   )
 }
 
+function ContextualUnitMenu({
+  unit,
+  position,
+  battlePhase,
+  activePlayerId,
+  combatApRemaining,
+  actionMode,
+  moveDisabledReason,
+  attackDisabledReason,
+  onSetBattleAction,
+}: {
+  readonly unit: ScenarioUnit
+  readonly position: readonly [number, number, number]
+  readonly battlePhase: 'active' | 'ended'
+  readonly activePlayerId: string
+  readonly combatApRemaining: number | undefined
+  readonly actionMode: 'select' | 'move' | 'attack'
+  readonly moveDisabledReason: string
+  readonly attackDisabledReason: string
+  readonly onSetBattleAction: (
+    mode: 'select' | 'move' | 'attack',
+  ) => void
+}) {
+  const isActivePlayerUnit = unit.owner === activePlayerId
+  return (
+    <Html
+      calculatePosition={calculateActionMenuPosition}
+      center={false}
+      pointerEvents="auto"
+      position={position}
+      zIndexRange={[30, 0]}
+    >
+      <div
+        className="context-action-menu"
+        role="group"
+        aria-label={`Actions for ${unit.name}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="context-action-heading">
+          <strong>{unit.name}</strong>
+          <span>
+            {combatApRemaining === undefined
+              ? unit.owner
+              : `${combatApRemaining} AP`}
+          </span>
+        </div>
+        {battlePhase === 'active' && isActivePlayerUnit ? (
+          <>
+            <div className="context-action-buttons">
+              <button
+                type="button"
+                className={`context-action-button${actionMode === 'move' ? ' active' : ''}`}
+                disabled={Boolean(moveDisabledReason)}
+                title={moveDisabledReason || 'Move to a highlighted hex'}
+                aria-label={
+                  moveDisabledReason
+                    ? `Move unavailable: ${moveDisabledReason}`
+                    : 'Move'
+                }
+                onClick={() => onSetBattleAction('move')}
+              >
+                <span aria-hidden="true">↗</span> Move
+              </button>
+              <button
+                type="button"
+                className={`context-action-button${actionMode === 'attack' ? ' active' : ''}`}
+                disabled={Boolean(attackDisabledReason)}
+                title={attackDisabledReason || 'Choose a highlighted enemy target'}
+                aria-label={
+                  attackDisabledReason
+                    ? `Attack unavailable: ${attackDisabledReason}`
+                    : 'Attack'
+                }
+                onClick={() => onSetBattleAction('attack')}
+              >
+                <span aria-hidden="true">⌖</span> Attack
+              </button>
+              {actionMode !== 'select' && (
+                <button
+                  type="button"
+                  className="context-action-cancel"
+                  onClick={() => onSetBattleAction('select')}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            {actionMode !== 'select' && (
+              <small className="context-action-hint">
+                {actionMode === 'move'
+                  ? 'Choose a highlighted destination.'
+                  : 'Choose a highlighted enemy.'}
+              </small>
+            )}
+            {(moveDisabledReason || attackDisabledReason) && (
+              <small className="context-action-reason">
+                {moveDisabledReason && attackDisabledReason
+                  ? moveDisabledReason === attackDisabledReason
+                    ? moveDisabledReason
+                    : `${moveDisabledReason} ${attackDisabledReason}`
+                  : moveDisabledReason ?? attackDisabledReason}
+              </small>
+            )}
+          </>
+        ) : (
+          <small className="context-action-reason">
+            {battlePhase === 'ended'
+              ? 'Battle complete.'
+              : `Only ${activePlayerId} units can act.`}
+          </small>
+        )}
+      </div>
+    </Html>
+  )
+}
+
 function CameraController({ resetVersion }: { readonly resetVersion: number }) {
   const controls = useRef<OrbitControlsImpl>(null)
 
@@ -374,6 +551,11 @@ function BattlefieldScene({
   deploymentMode,
   battleMode,
   battleActionMode,
+  battlePhase,
+  activePlayerId,
+  combatApRemaining,
+  moveDisabledReason,
+  attackDisabledReason,
   movementHexIds,
   movementRouteHexIds,
   attackHexIds,
@@ -384,6 +566,7 @@ function BattlefieldScene({
   onSelectHex,
   onSelectUnit,
   onHoverHex,
+  onSetBattleAction,
   resetVersion,
 }: BattlefieldProps & { readonly resetVersion: number }) {
   const hexById = useMemo(
@@ -465,6 +648,7 @@ function BattlefieldScene({
                   )?.owner,
               )?.color ?? null
             }
+            selected={selectedHexId === hex.id}
             onSelect={() => onSelectHex(hex.id)}
           />
         )
@@ -496,6 +680,34 @@ function BattlefieldScene({
           />
         )
       })}
+      {battleMode &&
+        battlePhase &&
+        activePlayerId &&
+        selectedUnitId &&
+        (() => {
+          const selectedUnit = units.find(({ id }) => id === selectedUnitId)
+          if (!selectedUnit) return null
+          const position = axialToWorld(selectedUnit)
+          const hex = hexById.get(`hex:${selectedUnit.q},${selectedUnit.r}`)
+          if (!hex) return null
+          return (
+            <ContextualUnitMenu
+              unit={selectedUnit}
+              position={[
+                position.x + 0.72,
+                elevationAt(hex) + 1.2,
+                position.z,
+              ]}
+              battlePhase={battlePhase}
+              activePlayerId={activePlayerId}
+              combatApRemaining={combatApRemaining}
+              actionMode={battleActionMode}
+              moveDisabledReason={moveDisabledReason ?? ''}
+              attackDisabledReason={attackDisabledReason ?? ''}
+              onSetBattleAction={onSetBattleAction}
+            />
+          )
+        })()}
       {deploymentTargetHexId && selectedUnitId && (() => {
         const unit = units.find(({ id }) => id === selectedUnitId)
         const targetHex = hexById.get(deploymentTargetHexId)

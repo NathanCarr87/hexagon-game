@@ -8,6 +8,8 @@ export interface WorldPosition {
   readonly z: number
 }
 
+export const HEX_SIZE = 1
+
 export const HEX_DIRECTIONS: readonly AxialCoordinate[] = [
   { q: 1, r: 0 },
   { q: 1, r: -1 },
@@ -43,7 +45,7 @@ export function areHexesAdjacent(
 
 export function axialToWorld(
   { q, r }: AxialCoordinate,
-  size = 1,
+  size = HEX_SIZE,
 ): WorldPosition {
   return {
     x: Math.sqrt(3) * size * (q + r / 2),

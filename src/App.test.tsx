@@ -17,6 +17,9 @@ vi.mock('./game/scene/Battlefield', () => ({
       <button onClick={() => onSelectHex('hex:0,3')} type="button">
         Select empty hex
       </button>
+      <button onClick={() => onSelectHex('hex:0,-2')} type="button">
+        Select objective hex
+      </button>
     </div>
   ),
 }))
@@ -62,6 +65,20 @@ describe('App', () => {
 
     expect(screen.getByText('Unoccupied hex')).toBeInTheDocument()
     expect(screen.getAllByText('mountains')).toHaveLength(2)
+  })
+
+  it('shows the selected objective and its scoring meaning', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Select objective hex' }))
+
+    expect(screen.getByText('North Marker')).toBeInTheDocument()
+    expect(screen.getByText('BATTLE OBJECTIVE')).toBeInTheDocument()
+    expect(screen.getByText('Unoccupied')).toBeInTheDocument()
+    expect(screen.getByText(/scoring begins when battle starts/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start battle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select objective hex' }))
+    expect(screen.getByText(/First to 3 objective points wins/i)).toBeInTheDocument()
   })
 
   it('starts a battle, advances player turns, and restarts the battle', () => {

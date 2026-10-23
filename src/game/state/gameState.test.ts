@@ -332,4 +332,69 @@ describe('scenario setup state', () => {
     expect(state.battle).toBe(battle)
     expect(state.battleMessage).toMatch(/active-player/)
   })
+
+  it('enters movement mode only for the active selected unit and cancels it on selection change', () => {
+    const started = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'start-battle' },
+      initialScenario,
+    )
+    const activeUnit = started.battle!.units.find(
+      ({ owner }) => owner === started.battle!.activePlayerId,
+    )!
+    const inactiveUnit = started.battle!.units.find(
+      ({ owner }) => owner !== started.battle!.activePlayerId,
+    )!
+    const selected = gameReducer(
+      started,
+      { type: 'select-unit', unitId: activeUnit.id },
+      initialScenario,
+    )
+    const moving = gameReducer(
+      selected,
+      { type: 'set-battle-action', mode: 'move' },
+      initialScenario,
+    )
+
+    expect(moving.battleActionMode).toBe('move')
+
+    const switched = gameReducer(
+      moving,
+      { type: 'select-unit', unitId: inactiveUnit.id },
+      initialScenario,
+    )
+    expect(switched.battleActionMode).toBe('select')
+
+    const rejected = gameReducer(
+      switched,
+      { type: 'set-battle-action', mode: 'move' },
+      initialScenario,
+    )
+    expect(rejected.battleActionMode).toBe('select')
+    expect(rejected.battleMessage).toMatch(/active player/)
+  })
+
+  it('does not enter attack mode when the selected unit has no legal target', () => {
+    const started = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'start-battle' },
+      initialScenario,
+    )
+    const activeUnit = started.battle!.units.find(
+      ({ owner }) => owner === started.battle!.activePlayerId,
+    )!
+    const selected = gameReducer(
+      started,
+      { type: 'select-unit', unitId: activeUnit.id },
+      initialScenario,
+    )
+    const rejected = gameReducer(
+      selected,
+      { type: 'set-battle-action', mode: 'attack' },
+      initialScenario,
+    )
+
+    expect(rejected.battleActionMode).toBe('select')
+    expect(rejected.battleMessage).toMatch(/No legal attack target/)
+  })
 })

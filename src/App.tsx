@@ -27,6 +27,19 @@ function App() {
   const selectedHex = scenario.hexes.find(
     (hex) => hex.id === gameState.selectedHexId,
   )
+  const selectedObjective = selectedHex
+    ? scenario.objectives.find(
+        ({ q, r }) => q === selectedHex.q && r === selectedHex.r,
+      )
+    : undefined
+  const objectiveOccupant = selectedObjective
+    ? activeUnits.find(
+        ({ q, r }) => q === selectedObjective.q && r === selectedObjective.r,
+      )
+    : undefined
+  const objectiveController = scenario.playerDefinitions.find(
+    ({ id }) => id === objectiveOccupant?.owner,
+  )
   const selectedUnit = activeUnits.find(
     (unit) => unit.id === gameState.selectedUnitId,
   )
@@ -78,6 +91,36 @@ function App() {
     .map((unitId) => activeUnits.find(({ id }) => id === unitId))
     .filter((unit): unit is NonNullable<typeof unit> => Boolean(unit))
     .map((unit) => `hex:${unit.q},${unit.r}`)
+  const selectedCombatUnit = gameState.battle?.units.find(
+    ({ id }) => id === gameState.selectedUnitId,
+  )
+  const unitCanAct =
+    gameState.battle?.phase === 'active' &&
+    selectedCombatUnit?.owner === gameState.battle.activePlayerId
+  const moveDisabledReason = !gameState.battle
+    ? 'Battle is not active.'
+    : gameState.battle.phase !== 'active'
+      ? 'Battle is complete.'
+      : !unitCanAct
+        ? 'Only the active player’s units can act.'
+        : selectedCombatUnit.combatApRemaining <
+            scenario.battleRules.movementApCost
+          ? 'This unit has no combat AP remaining.'
+          : movementHexIds.length === 0
+            ? 'No legal movement destinations are available.'
+            : null
+  const attackDisabledReason = !gameState.battle
+    ? 'Battle is not active.'
+    : gameState.battle.phase !== 'active'
+      ? 'Battle is complete.'
+      : !unitCanAct
+        ? 'Only the active player’s units can act.'
+        : selectedCombatUnit.combatApRemaining <
+            scenario.battleRules.attackApCost
+          ? 'This unit has no combat AP remaining.'
+          : attackHexIds.length === 0
+            ? 'No legal attack target is available.'
+            : null
 
   return (
     <main className="game-shell">
@@ -145,6 +188,11 @@ function App() {
               deploymentMode={gameState.mode === 'deployment'}
               battleMode={gameState.mode === 'battle'}
               battleActionMode={gameState.battleActionMode}
+              battlePhase={gameState.battle?.phase ?? null}
+              activePlayerId={gameState.battle?.activePlayerId ?? null}
+              combatApRemaining={selectedCombatUnit?.combatApRemaining}
+              moveDisabledReason={moveDisabledReason}
+              attackDisabledReason={attackDisabledReason}
               movementHexIds={movementHexIds}
               movementRouteHexIds={movementRouteHexIds}
               attackHexIds={attackHexIds}
@@ -188,6 +236,9 @@ function App() {
                 }
               }}
               onHoverHex={setHoveredHexId}
+              onSetBattleAction={(mode) =>
+                dispatch({ type: 'set-battle-action', mode })
+              }
             />
             <div className="scene-caption">
               <span>
@@ -228,6 +279,18 @@ function App() {
               selectedDefinition?.combat.attackRange ??
               scenario.battleRules.defaultAttackRange
             }
+            objective={selectedObjective}
+            objectiveController={objectiveController}
+            objectiveScores={gameState.battle?.objectiveScores ?? {}}
+            objectiveScoreToWin={
+              ['objectives', 'either', 'both'].includes(
+                scenario.battleRules.victory.mode,
+              )
+                ? scenario.battleRules.victory.objectiveScoreToWin
+                : undefined
+            }
+            battleStarted={Boolean(gameState.battle)}
+            playerNames={scenario.playerDefinitions}
           />
           {gameState.mode === 'battle' ? (
             <BattlePanel

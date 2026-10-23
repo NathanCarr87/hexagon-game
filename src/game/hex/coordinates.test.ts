@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   areHexesAdjacent,
   axialToWorld,
+  HEX_DIRECTIONS,
+  HEX_SIZE,
   hexDisk,
   hexDistance,
   hexId,
@@ -36,6 +38,39 @@ describe('axial hex utilities', () => {
       const position = axialToWorld(neighbor, radius)
       const distance = Math.hypot(position.x - center.x, position.z - center.z)
       expect(distance).toBeCloseTo(Math.sqrt(3) * radius, 10)
+    }
+  })
+
+  it('shares full edges across all six directions throughout a large grid', () => {
+    const cells = hexDisk(4)
+    const corners = Array.from({ length: 6 }, (_, index) => {
+      const angle = Math.PI / 2 + (index * Math.PI) / 3
+      return {
+        x: Math.cos(angle) * HEX_SIZE,
+        z: Math.sin(angle) * HEX_SIZE,
+      }
+    })
+
+    for (const cell of cells) {
+      const center = axialToWorld(cell)
+      for (const direction of HEX_DIRECTIONS) {
+        const neighbor = {
+          q: cell.q + direction.q,
+          r: cell.r + direction.r,
+        }
+        const neighborCenter = axialToWorld(neighbor)
+        const sharedVertices = corners.filter((corner) => {
+          const worldX = center.x + corner.x
+          const worldZ = center.z + corner.z
+          return corners.some((neighborCorner) => {
+            const neighborX = neighborCenter.x + neighborCorner.x
+            const neighborZ = neighborCenter.z + neighborCorner.z
+            return Math.hypot(worldX - neighborX, worldZ - neighborZ) < 1e-9
+          })
+        })
+
+        expect(sharedVertices).toHaveLength(2)
+      }
     }
   })
 

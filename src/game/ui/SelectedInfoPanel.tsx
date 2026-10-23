@@ -1,5 +1,7 @@
 import type {
   BattlefieldHex,
+  ScenarioObjective,
+  ScenarioPlayer,
   ScenarioUnit,
   UnitDefinition,
 } from '../domain/types'
@@ -12,6 +14,12 @@ interface SelectedInfoPanelProps {
   readonly combatApRemaining?: number
   readonly maxCombatAp?: number
   readonly attackRange?: number
+  readonly objective: ScenarioObjective | undefined
+  readonly objectiveController: ScenarioPlayer | undefined
+  readonly objectiveScores: Readonly<Record<string, number>>
+  readonly objectiveScoreToWin: number | undefined
+  readonly battleStarted: boolean
+  readonly playerNames: readonly ScenarioPlayer[]
 }
 
 export function SelectedInfoPanel({
@@ -22,13 +30,62 @@ export function SelectedInfoPanel({
   combatApRemaining,
   maxCombatAp,
   attackRange,
+  objective,
+  objectiveController,
+  objectiveScores,
+  objectiveScoreToWin,
+  battleStarted,
+  playerNames,
 }: SelectedInfoPanelProps) {
   return (
-    <section className="panel selected-panel" aria-labelledby="selection-title">
+    <section
+      className="panel selected-panel"
+      aria-labelledby="selection-title"
+    >
       <div className="panel-heading">
-        <h2 id="selection-title">Selected unit</h2>
+        <h2 id="selection-title">
+          {unit
+            ? 'Selected unit'
+            : objective
+              ? 'Selected objective'
+              : hex
+                ? 'Selected hex'
+                : 'Selection'}
+        </h2>
         <span className="selection-mark" aria-hidden="true" />
       </div>
+      {objective && (
+        <div className="objective-inspection" aria-label="Objective details">
+          <span className="objective-inspection-type">BATTLE OBJECTIVE</span>
+          <p className="objective-inspection-name">{objective.name}</p>
+          <p className="objective-inspection-status">
+            {objectiveController
+              ? `Occupied by ${objectiveController.name}`
+              : 'Unoccupied'}
+          </p>
+          {battleStarted ? (
+            <>
+              <div className="objective-inspection-scores">
+                {playerNames.map((player) => (
+                  <span key={player.id}>
+                    {player.name} <strong>{objectiveScores[player.id] ?? 0}</strong>
+                  </span>
+                ))}
+              </div>
+              <p className="objective-inspection-rule">
+                Scores 1 point at the end of a turn when occupied by the active player.
+                {objectiveScoreToWin !== undefined &&
+                  ` First to ${objectiveScoreToWin} objective points wins.`}
+              </p>
+            </>
+          ) : (
+            <p className="objective-inspection-rule">
+              Scores 1 point at the end of a turn when occupied by the active player.
+              Scoring begins when battle starts.
+            </p>
+          )}
+        </div>
+      )}
       {unit ? (
         <>
           <p className="unit-name">{unit.name}</p>
@@ -103,7 +160,9 @@ export function SelectedInfoPanel({
         </>
       ) : hex ? (
         <>
-          <p className="unit-name hex-selection">Unoccupied hex</p>
+          <p className="unit-name hex-selection">
+            {objective ? 'Objective hex' : 'Unoccupied hex'}
+          </p>
           <p className="unit-type">{hex.terrain}</p>
           <div className="unit-owner">
             <span className="coordinate">

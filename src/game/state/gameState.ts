@@ -10,6 +10,8 @@ import {
   attackUnit,
   createBattle,
   endPlayerTurn,
+  getAttackTargets,
+  getMovementDestinations,
   moveUnit,
   restartBattle,
   type BattleState,
@@ -134,7 +136,53 @@ export function gameReducer(
   }
   if (action.type === 'set-battle-action') {
     if (!state.battle || state.battle.phase !== 'active') return state
-    return { ...state, battleActionMode: action.mode, battleMessage: null }
+    if (action.mode === 'select') {
+      return { ...state, battleActionMode: 'select', battleMessage: null }
+    }
+    const selectedUnit = state.battle.units.find(
+      ({ id }) => id === state.selectedUnitId,
+    )
+    if (!selectedUnit) {
+      return {
+        ...state,
+        battleMessage: 'Select a unit before choosing an action.',
+      }
+    }
+    if (selectedUnit.owner !== state.battle.activePlayerId) {
+      return {
+        ...state,
+        battleMessage: 'Only the active player’s units can act.',
+      }
+    }
+    const actionCost =
+      action.mode === 'move'
+        ? scenario.battleRules.movementApCost
+        : scenario.battleRules.attackApCost
+    if (selectedUnit.combatApRemaining < actionCost) {
+      return {
+        ...state,
+        battleMessage:
+          'This unit has no combat AP remaining. End the turn to refresh it.',
+      }
+    }
+    const availableActions =
+      action.mode === 'move'
+        ? getMovementDestinations(state.battle, selectedUnit.id, scenario)
+        : getAttackTargets(state.battle, selectedUnit.id, scenario)
+    if (availableActions.length === 0) {
+      return {
+        ...state,
+        battleMessage:
+          action.mode === 'move'
+            ? 'No legal movement destinations are available.'
+            : 'No legal attack target is available.',
+      }
+    }
+    return {
+      ...state,
+      battleActionMode: action.mode,
+      battleMessage: null,
+    }
   }
   if (action.type === 'move-unit') {
     if (!state.battle) return state
@@ -193,6 +241,7 @@ export function gameReducer(
             ...state,
             selectedUnitId: unit.id,
             selectedHexId: hexId(unit),
+            battleActionMode: 'select',
             battleMessage: null,
           }
         : state
