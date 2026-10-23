@@ -21,6 +21,7 @@ interface BattlefieldProps {
   readonly battleMode: boolean
   readonly battleActionMode: 'select' | 'move' | 'attack'
   readonly movementHexIds: readonly string[]
+  readonly movementRouteHexIds: readonly string[]
   readonly attackHexIds: readonly string[]
   readonly eligibleHexIds: readonly string[]
   readonly deploymentZoneOwnerByHex: Readonly<Record<string, string>>
@@ -28,6 +29,7 @@ interface BattlefieldProps {
   readonly deploymentTargetHexId: string | null
   readonly onSelectHex: (hexId: string) => void
   readonly onSelectUnit: (unitId: string) => void
+  readonly onHoverHex: (hexId: string | null) => void
 }
 
 const HEX_RADIUS = 1
@@ -43,7 +45,9 @@ function HexTile({
   deploymentStatus,
   deploymentZoneColor,
   isTarget,
+  isRouteHex,
   onSelect,
+  onHover,
 }: {
   readonly hex: BattlefieldHex
   readonly selected: boolean
@@ -56,7 +60,9 @@ function HexTile({
     | null
   readonly deploymentZoneColor: string | null
   readonly isTarget: boolean
+  readonly isRouteHex: boolean
   readonly onSelect: () => void
+  readonly onHover: (hovered: boolean) => void
 }) {
   const appearance = TERRAIN_APPEARANCE[hex.terrain]
   const position = axialToWorld(hex)
@@ -71,9 +77,11 @@ function HexTile({
       }}
       onPointerEnter={() => {
         document.body.style.cursor = 'pointer'
+        onHover(true)
       }}
       onPointerLeave={() => {
         document.body.style.cursor = ''
+        onHover(false)
       }}
     >
       <mesh
@@ -126,6 +134,15 @@ function HexTile({
             side={2}
             transparent
           />
+        </mesh>
+      )}
+      {isRouteHex && (
+        <mesh
+          position={[0, top + 0.035, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <ringGeometry args={[0.45, 0.53, 6]} />
+          <meshBasicMaterial color="#d5ef91" side={2} />
         </mesh>
       )}
       {isTarget && (
@@ -358,6 +375,7 @@ function BattlefieldScene({
   battleMode,
   battleActionMode,
   movementHexIds,
+  movementRouteHexIds,
   attackHexIds,
   eligibleHexIds,
   deploymentZoneOwnerByHex,
@@ -365,6 +383,7 @@ function BattlefieldScene({
   deploymentTargetHexId,
   onSelectHex,
   onSelectUnit,
+  onHoverHex,
   resetVersion,
 }: BattlefieldProps & { readonly resetVersion: number }) {
   const hexById = useMemo(
@@ -422,7 +441,9 @@ function BattlefieldScene({
               : null
           }
           isTarget={deploymentTargetHexId === hex.id}
+          isRouteHex={movementRouteHexIds.includes(hex.id)}
           onSelect={() => onSelectHex(hex.id)}
+          onHover={(hovered) => onHoverHex(hovered ? hex.id : null)}
         />
       ))}
       {scenario.objectives.map((objective) => {
@@ -470,11 +491,7 @@ function BattlefieldScene({
             onSelect={() =>
               deploymentMode
                 ? onSelectHex(unitHex.id)
-                : battleMode &&
-                    battleActionMode === 'move' &&
-                    selectedUnitId
-                  ? onSelectHex(unitHex.id)
-                  : onSelectUnit(unit.id)
+                : onSelectUnit(unit.id)
             }
           />
         )

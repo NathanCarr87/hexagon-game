@@ -213,7 +213,12 @@ export function gameReducer(
         )
       }
       return scenario.hexes.some(({ id }) => id === action.hexId)
-        ? { ...state, selectedHexId: action.hexId, battleMessage: null }
+        ? {
+            ...state,
+            selectedUnitId: null,
+            selectedHexId: action.hexId,
+            battleMessage: null,
+          }
         : state
     }
     return state

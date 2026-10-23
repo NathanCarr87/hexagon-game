@@ -71,6 +71,10 @@ describe('App', () => {
     const battle = screen.getByRole('region', { name: 'Battle' })
     expect(battle).toHaveTextContent('ACTIVE')
     expect(battle).toHaveTextContent(/Round 1/)
+    expect(battle).toHaveTextContent(/Battle phase/)
+    expect(battle).toHaveTextContent(/Objective score · first to 3/)
+    expect(battle).toHaveTextContent(/Victory: either/)
+    expect(battle).toHaveTextContent(/q0 \/ r-2/)
     expect(battle).toHaveTextContent(/starts round 1/)
 
     fireEvent.click(screen.getByRole('button', { name: /^End .* turn$/ }))
@@ -90,7 +94,7 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: 'Open Ground' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('grassland')).toBeInTheDocument()
+    expect(screen.getAllByText('grassland').length).toBeGreaterThan(0)
     expect(screen.queryByText('water')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Start battle' }))

@@ -54,6 +54,17 @@ export interface MovementDestination {
   readonly movementCost: number
 }
 
+export interface AttackPreview {
+  readonly distance: number
+  readonly range: number
+  readonly power: number
+  readonly guard: number
+  readonly elevationBonus: number
+  readonly damage: number
+  readonly remainingHp: number
+  readonly willDefeat: boolean
+}
+
 const terrainElevation = (
   terrain: TerrainType,
   scenario: BattlefieldScenario,
@@ -231,24 +242,42 @@ export function getMovementDestinations(
   unitId: string,
   scenario: BattlefieldScenario,
 ): readonly MovementDestination[] {
-  if (battle.phase !== 'active') return []
+  const search = findMovementRoutes(battle, unitId, scenario)
+  if (!search) return []
+  return [...search.costs.entries()]
+    .filter(([id]) => id !== search.startId)
+    .map(([id, movementCost]) => ({ hexId: id, movementCost }))
+    .sort((a, b) => a.movementCost - b.movementCost || a.hexId.localeCompare(b.hexId))
+}
+
+function findMovementRoutes(
+  battle: BattleState,
+  unitId: string,
+  scenario: BattlefieldScenario,
+): {
+  readonly startId: string
+  readonly costs: Map<string, number>
+  readonly previous: Map<string, string>
+} | null {
+  if (battle.phase !== 'active') return null
   const unit = battle.units.find(({ id }) => id === unitId)
   if (
     !unit ||
     unit.owner !== battle.activePlayerId ||
     unit.combatApRemaining < scenario.battleRules.movementApCost
   ) {
-    return []
+    return null
   }
   const mobility = unit.definition.combat.mobility
-  if (!Number.isFinite(mobility) || mobility <= 0) return []
+  if (!Number.isFinite(mobility) || mobility <= 0) return null
   const occupied = new Set(
     battle.units
       .filter(({ id }) => id !== unit.id)
       .map((candidate) => hexId(candidate)),
   )
   const startId = hexId(unit)
-  const bestCost = new Map<string, number>([[startId, 0]])
+  const costs = new Map<string, number>([[startId, 0]])
+  const previous = new Map<string, string>()
   const pending: Array<{ coordinate: AxialCoordinate; cost: number }> = [
     { coordinate: unit, cost: 0 },
   ]
@@ -258,7 +287,7 @@ export function getMovementDestinations(
     const current = pending.shift()
     if (!current) break
     const currentId = hexId(current.coordinate)
-    if (current.cost !== bestCost.get(currentId)) continue
+    if (current.cost !== costs.get(currentId)) continue
     for (const neighbor of hexNeighbors(current.coordinate)) {
       const neighborId = hexId(neighbor)
       if (occupied.has(neighborId)) continue
@@ -267,18 +296,34 @@ export function getMovementDestinations(
       const stepCost = passableCost(hex, scenario)
       if (stepCost === null) continue
       const cost = current.cost + stepCost
-      if (cost > mobility || cost >= (bestCost.get(neighborId) ?? Infinity)) {
+      if (cost > mobility || cost >= (costs.get(neighborId) ?? Infinity)) {
         continue
       }
-      bestCost.set(neighborId, cost)
+      costs.set(neighborId, cost)
+      previous.set(neighborId, currentId)
       pending.push({ coordinate: neighbor, cost })
     }
   }
+  return { startId, costs, previous }
+}
 
-  return [...bestCost.entries()]
-    .filter(([id]) => id !== startId)
-    .map(([id, movementCost]) => ({ hexId: id, movementCost }))
-    .sort((a, b) => a.movementCost - b.movementCost || a.hexId.localeCompare(b.hexId))
+export function getMovementRoute(
+  battle: BattleState,
+  unitId: string,
+  destinationHexId: string,
+  scenario: BattlefieldScenario,
+): readonly string[] {
+  const search = findMovementRoutes(battle, unitId, scenario)
+  if (!search || !search.costs.has(destinationHexId)) return []
+  const route = [destinationHexId]
+  let currentId = destinationHexId
+  while (currentId !== search.startId) {
+    const parentId = search.previous.get(currentId)
+    if (!parentId) return []
+    route.push(parentId)
+    currentId = parentId
+  }
+  return route.reverse()
 }
 
 export function moveUnit(
@@ -430,6 +475,45 @@ export function getAttackTargets(
     .map(({ id }) => id)
 }
 
+export function getAttackPreview(
+  battle: BattleState,
+  attackerId: string,
+  targetId: string,
+  scenario: BattlefieldScenario,
+): AttackPreview | null {
+  const status = getAttackTargetStatus(battle, attackerId, targetId, scenario)
+  if (!status.legal) return null
+  const attacker = battle.units.find(({ id }) => id === attackerId)
+  const target = battle.units.find(({ id }) => id === targetId)
+  if (!attacker || !target) return null
+  const attackerHex = hexFor(attacker, scenario)
+  const targetHex = hexFor(target, scenario)
+  if (!attackerHex || !targetHex) return null
+
+  const power = attacker.definition.combat.power
+  const guard = target.definition.combat.guard
+  if (!Number.isFinite(power) || !Number.isFinite(guard)) return null
+  const elevationBonus =
+    terrainElevation(attackerHex.terrain, scenario) >
+    terrainElevation(targetHex.terrain, scenario)
+      ? 1
+      : 0
+  const damage = Math.max(1, power + elevationBonus - guard)
+  const remainingHp = Math.max(0, target.currentHp - damage)
+  return {
+    distance: hexDistance(attacker, target),
+    range:
+      attacker.definition.combat.attackRange ??
+      scenario.battleRules.defaultAttackRange,
+    power,
+    guard,
+    elevationBonus,
+    damage,
+    remainingHp,
+    willDefeat: remainingHp === 0,
+  }
+}
+
 function objectiveConditionMet(
   playerId: string,
   scores: Readonly<Record<string, number>>,
@@ -560,23 +644,20 @@ export function attackUnit(
       error: `That unit is not a legal attack target. ${targetStatus.reason ?? ''}`.trim(),
     }
   }
-  const attackerHex = hexFor(attacker, scenario)
-  const targetHex = hexFor(target, scenario)
-  if (!attackerHex || !targetHex) {
+  if (!hexFor(attacker, scenario) || !hexFor(target, scenario)) {
     return { state: battle, error: 'An attack unit is not on the battlefield.' }
   }
-  const elevationBonus =
-    terrainElevation(attackerHex.terrain, scenario) >
-    terrainElevation(targetHex.terrain, scenario)
-      ? 1
-      : 0
-  const power = attacker.definition.combat.power
-  const guard = target.definition.combat.guard
-  if (!Number.isFinite(power) || !Number.isFinite(guard)) {
+  if (
+    !Number.isFinite(attacker.definition.combat.power) ||
+    !Number.isFinite(target.definition.combat.guard)
+  ) {
     return { state: battle, error: 'Attack requires configured Power and Guard.' }
   }
-  const damage = Math.max(1, power + elevationBonus - guard)
-  const remainingHp = Math.max(0, target.currentHp - damage)
+  const preview = getAttackPreview(battle, attackerId, targetId, scenario)
+  if (!preview) {
+    return { state: battle, error: 'Attack preview could not be calculated.' }
+  }
+  const { damage, remainingHp } = preview
   let updated: BattleState = {
     ...battle,
     units: battle.units

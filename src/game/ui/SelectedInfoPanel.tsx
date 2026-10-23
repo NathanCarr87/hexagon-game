@@ -10,6 +10,8 @@ interface SelectedInfoPanelProps {
   readonly hex: BattlefieldHex | undefined
   readonly ownerColor: string | undefined
   readonly combatApRemaining?: number
+  readonly maxCombatAp?: number
+  readonly attackRange?: number
 }
 
 export function SelectedInfoPanel({
@@ -18,6 +20,8 @@ export function SelectedInfoPanel({
   hex,
   ownerColor,
   combatApRemaining,
+  maxCombatAp,
+  attackRange,
 }: SelectedInfoPanelProps) {
   return (
     <section className="panel selected-panel" aria-labelledby="selection-title">
@@ -57,7 +61,11 @@ export function SelectedInfoPanel({
             </div>
             <div className="vital">
               <span>{combatApRemaining === undefined ? 'AP' : 'COMBAT AP'}</span>
-              <strong>{combatApRemaining ?? unit.actionPointsRemaining}</strong>
+              <strong>
+                {combatApRemaining === undefined
+                  ? unit.actionPointsRemaining
+                  : `${combatApRemaining}${maxCombatAp === undefined ? '' : ` / ${maxCombatAp}`}`}
+              </strong>
             </div>
           </div>
           <div className="stats-list" aria-label="Unit combat attributes">
@@ -77,13 +85,21 @@ export function SelectedInfoPanel({
                   <strong>{value}</strong>
                 </div>
               ))}
-            {definition?.combat.attackRange !== undefined && (
+            {attackRange !== undefined && (
               <div className="stat-row">
                 <span>Attack range</span>
-                <strong>{definition.combat.attackRange}</strong>
+                <strong>{attackRange}</strong>
               </div>
             )}
           </div>
+          {hex && (
+            <div className="hex-details unit-terrain">
+              <span>Current terrain</span>
+              <strong>{hex.terrain}</strong>
+              <span>Elevation</span>
+              <strong>{hex.elevation}</strong>
+            </div>
+          )}
         </>
       ) : hex ? (
         <>

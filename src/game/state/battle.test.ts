@@ -12,9 +12,11 @@ import {
   createBattle,
   endPlayerTurn,
   evaluateVictory,
+  getAttackPreview,
   getAttackTargets,
   getAttackTargetStatus,
   getMovementDestinations,
+  getMovementRoute,
   moveUnit,
   restartBattle,
   validateBattleSetup,
@@ -251,6 +253,31 @@ describe('battle movement', () => {
     )
   })
 
+  it('previews a route using only reachable, unoccupied hexes', () => {
+    const scenario = scenarioWith()
+    const battle = start(scenario)
+    const route = getMovementRoute(
+      battle,
+      'unit-ironwatch-01',
+      'hex:-2,-1',
+      scenario,
+    )
+
+    expect(route[0]).toBe('hex:-2,0')
+    expect(route.at(-1)).toBe('hex:-2,-1')
+    expect(
+      route.every((id) => scenario.hexes.some((hex) => hex.id === id)),
+    ).toBe(true)
+    expect(
+      getMovementRoute(
+        battle,
+        'unit-ironwatch-01',
+        'hex:-1,1',
+        scenario,
+      ),
+    ).toEqual([])
+  })
+
   it('blocks occupied and impassable terrain and leaves state unchanged on invalid movement', () => {
     const scenario = scenarioWith()
     const battle = start(scenario)
@@ -447,12 +474,23 @@ describe('battle attacks', () => {
     )
     const scenario = scenarioWith(units)
     const battle = start(scenario)
+    const preview = getAttackPreview(
+      battle,
+      'unit-ironwatch-01',
+      'unit-ashfall-01',
+      scenario,
+    )
     const attack = attackUnit(
       battle,
       'unit-ironwatch-01',
       'unit-ashfall-01',
       scenario,
     )
+    expect(preview).toMatchObject({
+      damage: 2,
+      remainingHp: 0,
+      willDefeat: true,
+    })
     expect(attack.error).toBeNull()
     expect(attack.state.units.some(({ id }) => id === 'unit-ashfall-01')).toBe(
       false,
@@ -463,7 +501,7 @@ describe('battle attacks', () => {
     ).toBe(1)
     expect(attack.state.log.map(({ message }) => message)).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/attacked Ashfall-01 for 2 damage/),
+        expect.stringContaining(`attacked Ashfall-01 for ${preview?.damage} damage`),
         'Ashfall-01 was destroyed.',
       ]),
     )

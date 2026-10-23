@@ -2,6 +2,7 @@ import type { BattlefieldScenario } from '../domain/types'
 import type { ScenarioUnit } from '../domain/types'
 import {
   getAttackTargets,
+  getAttackPreview,
   getAttackTargetStatus,
   getMovementDestinations,
   validateBattleSetup,
@@ -21,6 +22,9 @@ interface BattlePanelProps {
   readonly selectedUnitId: string | null
   readonly actionMode: 'select' | 'move' | 'attack'
   readonly message: string | null
+  readonly movementPreview:
+    | { readonly hexId: string; readonly movementCost: number }
+    | undefined
   readonly dispatch: (action: GameAction) => void
 }
 
@@ -31,6 +35,7 @@ export function BattlePanel({
   selectedUnitId,
   actionMode,
   message,
+  movementPreview,
   dispatch,
 }: BattlePanelProps) {
   const scenarioErrors = [
@@ -69,6 +74,12 @@ export function BattlePanel({
               unit.id,
               scenario,
             ),
+            preview: getAttackPreview(
+              battle,
+              selectedUnit.id,
+              unit.id,
+              scenario,
+            ),
           }))
       : []
   const unavailableReason =
@@ -100,6 +111,8 @@ export function BattlePanel({
       (unit) => unit.q === objective.q && unit.r === objective.r,
     )?.owner,
   }))
+  const victoryMode = scenario.battleRules.victory.mode
+  const tracksElimination = ['elimination', 'either', 'both'].includes(victoryMode)
 
   return (
     <section className="panel setup-panel battle-panel" aria-labelledby="battle-title">
@@ -136,7 +149,7 @@ export function BattlePanel({
             <>
               <div className="battle-turn">
                 <strong>{activePlayer?.name ?? battle.activePlayerId}</strong>
-                <span>Round {battle.round}</span>
+                <span>Round {battle.round} · Battle phase</span>
               </div>
               {selectedUnitId && (
                 <p className="deployment-rules">
@@ -153,6 +166,11 @@ export function BattlePanel({
             </div>
           )}
           <div className="score-list" aria-label="Objective scores">
+            <p className="score-heading">
+              Objective score
+              {scenario.battleRules.victory.objectiveScoreToWin !== undefined &&
+                ` · first to ${scenario.battleRules.victory.objectiveScoreToWin}`}
+            </p>
             {scenario.players.map((playerId) => (
               <div key={playerId}>
                 <span>
@@ -172,9 +190,37 @@ export function BattlePanel({
                       ({ id }) => id === objective.controller,
                     )?.name ?? objective.controller
                   : 'uncontrolled'}
+                <small>
+                  q{objective.q} / r{objective.r}
+                </small>
               </p>
             ))}
           </div>
+          <p className="victory-guidance">
+            Victory: {victoryMode}
+            {scenario.battleRules.victory.roundLimit !== undefined &&
+              ` · ${scenario.battleRules.victory.roundLimit}-round limit`}
+          </p>
+          {tracksElimination && (
+            <div className="elimination-progress" aria-label="Elimination progress">
+              {scenario.players.map((playerId) => {
+                const initialCount = battle.initialUnits.filter(
+                  ({ owner }) => owner === playerId,
+                ).length
+                const survivingCount = battle.units.filter(
+                  ({ owner, currentHp }) => owner === playerId && currentHp > 0,
+                ).length
+                const playerName =
+                  scenario.playerDefinitions.find(({ id }) => id === playerId)?.name ??
+                  playerId
+                return (
+                  <p key={playerId}>
+                    {playerName}: {survivingCount}/{initialCount} units
+                  </p>
+                )
+              })}
+            </div>
+          )}
           {battle.phase === 'active' && (
             <>
               <div className="mode-actions">
@@ -202,10 +248,23 @@ export function BattlePanel({
                   {unavailableReason}
                 </p>
               )}
+              {actionMode === 'move' && selectedUnit && (
+                <div className="movement-readout" aria-live="polite">
+                  {movementPreview ? (
+                    <>
+                      Preview: {movementPreview.hexId.replace('hex:', '')}
+                      {' · '}
+                      {movementPreview.movementCost} movement
+                    </>
+                  ) : (
+                    <>Choose a highlighted reachable hex to preview its route.</>
+                  )}
+                </div>
+              )}
               {actionMode === 'attack' && enemyTargetChecks.length > 0 && (
                 <div className="attack-readout" aria-label="Attack target checks">
                   <strong>Enemy target checks</strong>
-                  {enemyTargetChecks.map(({ unit, legal, reason }) => (
+                  {enemyTargetChecks.map(({ unit, legal, reason, preview }) => (
                     <p className={legal ? 'target-legal' : ''} key={unit.id}>
                       <span>{unit.name}</span>
                       <small>
@@ -214,6 +273,14 @@ export function BattlePanel({
                         {unit.definition.combat.guard}
                       </small>
                       <small>{legal ? 'Valid target' : reason}</small>
+                      {legal && preview && (
+                        <small>
+                          {preview.power} Power + {preview.elevationBonus}{' '}
+                          elevation − {preview.guard} Guard = {preview.damage}{' '}
+                          damage · {preview.remainingHp} HP remaining
+                          {preview.willDefeat ? ' · Defeated' : ''}
+                        </small>
+                      )}
                     </p>
                   ))}
                 </div>
@@ -222,6 +289,7 @@ export function BattlePanel({
                 className="control-button battle-control"
                 onClick={() => dispatch({ type: 'end-turn' })}
                 type="button"
+                aria-label={`End ${activePlayer?.name ?? 'player'} turn`}
               >
                 End {activePlayer?.name ?? 'player'} turn
               </button>
@@ -243,7 +311,7 @@ export function BattlePanel({
             Return to setup
           </button>
           <div className="battle-log" aria-label="Battle log" aria-live="polite">
-            {battle.log.slice().reverse().map((event) => (
+            {battle.log.slice(-50).reverse().map((event) => (
               <p key={event.id}>
                 <small>R{event.round}</small> {event.message}
               </p>

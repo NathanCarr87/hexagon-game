@@ -1,4 +1,4 @@
-import { useReducer } from 'react'
+import { useReducer, useState } from 'react'
 import { initialScenario } from './game/scenarios/initialScenario'
 import { scenarios } from './game/scenarios'
 import { createInitialGameState, gameReducer } from './game/state/gameState'
@@ -8,10 +8,15 @@ import { SelectedInfoPanel } from './game/ui/SelectedInfoPanel'
 import { TerrainLegend } from './game/ui/TerrainLegend'
 import { ForceSetupPanel } from './game/ui/ForceSetupPanel'
 import { BattlePanel } from './game/ui/BattlePanel'
-import { getAttackTargets, getMovementDestinations } from './game/state/battle'
+import {
+  getAttackTargets,
+  getMovementDestinations,
+  getMovementRoute,
+} from './game/state/battle'
 import { getUnitDefinition } from './game/domain/unitCatalog'
 
 function App() {
+  const [hoveredHexId, setHoveredHexId] = useState<string | null>(null)
   const [gameState, dispatch] = useReducer(
     (state: GameState, action: GameAction) => gameReducer(state, action),
     initialScenario,
@@ -41,13 +46,29 @@ function App() {
   const occupiedHexIds = activeUnits
     .filter((unit) => unit.id !== gameState.selectedUnitId)
     .map((unit) => `hex:${unit.q},${unit.r}`)
-  const movementHexIds =
+  const movementDestinations =
     gameState.battle && selectedUnit
       ? getMovementDestinations(
           gameState.battle,
           selectedUnit.id,
           scenario,
-        ).map(({ hexId }) => hexId)
+        )
+      : []
+  const movementHexIds = movementDestinations.map(({ hexId }) => hexId)
+  const movementPreview = gameState.battle && selectedUnit && hoveredHexId
+    ? movementDestinations.find(({ hexId }) => hexId === hoveredHexId)
+    : undefined
+  const movementRouteHexIds =
+    gameState.battle &&
+    selectedUnit &&
+    gameState.battleActionMode === 'move' &&
+    movementPreview
+      ? getMovementRoute(
+          gameState.battle,
+          selectedUnit.id,
+          movementPreview.hexId,
+          scenario,
+        )
       : []
   const attackUnitIds =
     gameState.battle && selectedUnit
@@ -125,12 +146,14 @@ function App() {
               battleMode={gameState.mode === 'battle'}
               battleActionMode={gameState.battleActionMode}
               movementHexIds={movementHexIds}
+              movementRouteHexIds={movementRouteHexIds}
               attackHexIds={attackHexIds}
               eligibleHexIds={eligibleHexIds}
               deploymentZoneOwnerByHex={deploymentZoneOwnerByHex}
               occupiedHexIds={occupiedHexIds}
               deploymentTargetHexId={gameState.deploymentTargetHexId}
               onSelectHex={(hexId) => {
+                setHoveredHexId(null)
                 if (
                   gameState.battle &&
                   gameState.battleActionMode === 'move' &&
@@ -146,6 +169,7 @@ function App() {
                 }
               }}
               onSelectUnit={(unitId) => {
+                setHoveredHexId(null)
                 const clicked = activeUnits.find(({ id }) => id === unitId)
                 if (
                   gameState.battle &&
@@ -163,6 +187,7 @@ function App() {
                   dispatch({ type: 'select-unit', unitId })
                 }
               }}
+              onHoverHex={setHoveredHexId}
             />
             <div className="scene-caption">
               <span>
@@ -194,6 +219,15 @@ function App() {
                 ({ id }) => id === selectedUnit?.id,
               )?.combatApRemaining
             }
+            maxCombatAp={
+              gameState.battle
+                ? scenario.battleRules.combatApPerTurn
+                : undefined
+            }
+            attackRange={
+              selectedDefinition?.combat.attackRange ??
+              scenario.battleRules.defaultAttackRange
+            }
           />
           {gameState.mode === 'battle' ? (
             <BattlePanel
@@ -203,6 +237,7 @@ function App() {
               selectedUnitId={gameState.selectedUnitId}
               actionMode={gameState.battleActionMode}
               message={gameState.battleMessage}
+              movementPreview={movementPreview}
               dispatch={dispatch}
             />
           ) : (
@@ -219,6 +254,7 @@ function App() {
                 selectedUnitId={gameState.selectedUnitId}
                 actionMode={gameState.battleActionMode}
                 message={gameState.battleMessage}
+                movementPreview={undefined}
                 dispatch={dispatch}
               />
             </>

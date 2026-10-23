@@ -31,6 +31,27 @@ describe('scenario setup state', () => {
     expect(hexState.selectedHexId).toBe('hex:4,-1')
   })
 
+  it('clears the selected unit when inspecting an empty battle hex', () => {
+    const started = gameReducer(
+      createInitialGameState(initialScenario),
+      { type: 'start-battle' },
+      initialScenario,
+    )
+    const selected = gameReducer(
+      started,
+      { type: 'select-unit', unitId: 'unit-ironwatch-01' },
+      initialScenario,
+    )
+    const inspected = gameReducer(
+      selected,
+      { type: 'select-hex', hexId: 'hex:0,3' },
+      initialScenario,
+    )
+
+    expect(inspected.selectedUnitId).toBeNull()
+    expect(inspected.selectedHexId).toBe('hex:0,3')
+  })
+
   it('previews and commits a legal placement within the selected owner zone', () => {
     const initial = createInitialGameState(initialScenario)
     const deploymentMode = gameReducer(
